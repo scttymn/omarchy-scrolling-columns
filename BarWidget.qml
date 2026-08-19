@@ -64,6 +64,22 @@ BarWidget {
   property int columnCount: 0
   readonly property bool overflowing: root.columnCount > root.columns
 
+  // Nothing may act on the compositor until the store has been read. The
+  // FileView loads asynchronously, so the first probe would otherwise see
+  // `columns` still falling back to defaultColumns, read the startup state as
+  // a transition into scrolling, and resize every existing column to the
+  // default -- silently discarding the count on every shell restart.
+  property bool ready: false
+
+  Timer {
+    // The store may legitimately not exist yet on a fresh install, in which
+    // case onLoaded never fires; fall back to the defaults after a beat.
+    interval: 750
+    running: true
+    repeat: false
+    onTriggered: root.ready = true
+  }
+
   // -1 unknown, 0 flush, 1 peeking. Re-applying on every probe would fight a
   // column the user resized by hand, so width is only rewritten when this
   // actually flips.
@@ -116,6 +132,9 @@ BarWidget {
     var wasScrolling = root.scrolling
     root.columnCount = parsed.columns
     root.tiledLayout = parsed.layout
+
+    // Track the layout before the store arrives, but touch nothing.
+    if (!root.ready) return
 
     // A workspace becoming scrolling has to re-assert width and anchor:
     // syncPeek only fires on a peek transition, which never happens with edge
@@ -176,7 +195,7 @@ BarWidget {
     printErrors: false
     onFileChanged: reload()
     onAdapterUpdated: root.revision++
-    onLoaded: root.revision++
+    onLoaded: { root.revision++; root.ready = true }
 
     JsonAdapter {
       property var workspaces: ({})
