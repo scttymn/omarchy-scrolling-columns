@@ -125,9 +125,27 @@ BarWidget {
     target: Hyprland
     function onRawEvent(event) {
       if (String(event.name) !== "configreloaded") return
+      // Correct first, ask questions after. Everything needed is already in
+      // memory -- the focused workspace is reactive and the count comes from
+      // the loaded store -- so waiting for a probe to confirm the layout only
+      // adds a round trip while the columns sit at the wrong width. The probe
+      // still follows, to update the count and run the anchoring fit.
+      root.reassertNow()
       root.probe()
       probeSoon.restart()
     }
+  }
+
+  // Both hyprctl calls in one shell invocation: two spawns here would put a
+  // second round trip back into the path this exists to remove. Safe if the
+  // workspace ended up tiled -- setting the config is inert there, and
+  // colresize fails harmlessly with "Unknown dwindle layoutmsg".
+  function reassertNow() {
+    if (!root.bar || !root.ready || root.workspaceId < 0) return
+    var w = root.widthText(root.columns)
+    root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
+      + "; hyprctl dispatch "
+      + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1")
   }
 
   function probe() {
