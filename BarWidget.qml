@@ -67,6 +67,14 @@ BarWidget {
   // layout-affecting path stands down until it is dismissed -- the
   // fullscreen>>0 event brings the correction along right behind it.
   property bool hasFullscreen: false
+
+  // Where the row sat before a window went fullscreen. Hyprland restores the
+  // formerly-fullscreen column into view, which scrolls the row somewhere the
+  // user never put it -- valid, but not where they left it. Remembering the
+  // offset while the row is visible is the only way to put it back, since
+  // during fullscreen the extents describe the fullscreen window instead.
+  property int rowLeftBeforeFullscreen: 0
+  property bool rowLeftRemembered: false
   readonly property bool overflowing: root.columnCount > root.columns
 
   // Nothing may act on the compositor until the store has been read. The
@@ -132,10 +140,24 @@ BarWidget {
   // A row where every column fits has no business hanging off either edge.
   // Rather than enumerate the things that scroll it -- a colresize, a window
   // opening, leaving fullscreen -- detect the state itself and snap it back.
-  function anchorIfAdrift(parsed) {
+  function rememberRowLeft(parsed, wasFullscreen) {
+    if (parsed.fullscreen || parsed.layout !== "scrolling" || parsed.columns < 1) return
+    // Do not overwrite the remembered offset with the position Hyprland just
+    // scrolled to -- that is the one being corrected.
+    if (wasFullscreen) return
+    root.rowLeftBeforeFullscreen = parsed.left
+    root.rowLeftRemembered = true
+  }
+
+  function anchorIfAdrift(parsed, wasFullscreen) {
     var live = Model.parseOptions(parsed.opts)
     if (!live) return
-    var delta = Model.anchorDelta(parsed, Model.marginFrom(live.gapsOut, live.borderSize))
+    // Coming out of fullscreen, aim for where the row was rather than for
+    // wherever it landed. Clamped either way, so a stale offset cannot put it
+    // somewhere invalid.
+    var preferred = (wasFullscreen && !parsed.fullscreen && root.rowLeftRemembered)
+      ? root.rowLeftBeforeFullscreen : null
+    var delta = Model.anchorDelta(parsed, Model.marginFrom(live.gapsOut, live.borderSize), preferred)
     if (Math.abs(delta) < 1) return
     // A pan, not a fit: this must not resize anything, only slide the row back
     // inside its own ends.
@@ -237,6 +259,7 @@ BarWidget {
     var wasScrolling = root.scrolling
     root.columnCount = parsed.columns
     root.tiledLayout = parsed.layout
+    var wasFullscreen = root.hasFullscreen
     root.hasFullscreen = parsed.fullscreen
 
     // Track the layout before the store arrives, but touch nothing.
@@ -267,7 +290,8 @@ BarWidget {
 
     root.syncPeek()
     root.correctDrift(parsed.opts)
-    root.anchorIfAdrift(parsed)
+    root.anchorIfAdrift(parsed, wasFullscreen)
+    root.rememberRowLeft(parsed, wasFullscreen)
   }
 
   // Hyprland is the live source of truth, and anything set through eval is

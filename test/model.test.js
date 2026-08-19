@@ -204,3 +204,25 @@ test("marginFrom reads css shorthand rather than assuming symmetry", () => {
   assert.strictEqual(M.marginFrom("10 10 10 10", 2), 12, "the symmetric case that hid the bug")
   assert.strictEqual(M.marginFrom("", undefined), 0)
 })
+
+test("anchorDelta aims for a remembered position, still clamped", () => {
+  const W = 3008, m = 12
+  const row = (left, right, columns = 4) => ({ layout: "scrolling", columns, left, right, width: W })
+
+  // Four columns, three fit: rowWidth 3976 on a 3008 monitor, so valid left
+  // runs from -980 (flush right) to 12 (flush left).
+  //
+  // The row sat at -500. Leaving fullscreen left it at 12; aim back.
+  assert.strictEqual(M.anchorDelta(row(12, 3988), m, -500), -512)
+
+  // A remembered offset past the end is clamped, not obeyed.
+  assert.strictEqual(M.anchorDelta(row(12, 3988), m, -1002), -992, "clamped to flush right")
+
+  // A remembered offset that is no longer reachable gets clamped, not obeyed:
+  // a window closed while fullscreen, so the row is shorter now.
+  assert.strictEqual(M.anchorDelta(row(12, 2996, 3), m, -1002), 0, "row now fits; flush left wins")
+
+  // No preference given behaves exactly as before.
+  assert.strictEqual(M.anchorDelta(row(-1990, 2000), m), 996)
+  assert.strictEqual(M.anchorDelta(row(-1990, 2000), m, null), 996)
+})

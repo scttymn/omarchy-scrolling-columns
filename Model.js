@@ -115,7 +115,10 @@ function optionsMatch(live, wantedWidthText, wantedFullscreen) {
 //
 // Valid positions run from flush-left (left == margin) to flush-right
 // (right == width - margin). A row that fits has only one: flush left.
-function anchorDelta(probe, margin) {
+// preferredLeft, when given, is where the row would like to sit -- the offset
+// it had before something moved it. It is clamped like any other position, so
+// a stale preference cannot scroll the row somewhere invalid.
+function anchorDelta(probe, margin, preferredLeft) {
   if (!probe || probe.layout !== "scrolling") return 0
   // A fullscreen window spans the monitor and is not part of the row, so the
   // extents describe something that is not the row.
@@ -129,7 +132,11 @@ function anchorDelta(probe, margin) {
   var minLeft = probe.width - margin - rowWidth     // flush right
   if (minLeft > maxLeft) minLeft = maxLeft          // fits: flush left is the only valid spot
 
-  var want = Math.min(maxLeft, Math.max(minLeft, probe.left))
+  var base = (preferredLeft === undefined || preferredLeft === null)
+    ? probe.left : Number(preferredLeft)
+  if (!isFinite(base)) base = probe.left
+
+  var want = Math.min(maxLeft, Math.max(minLeft, base))
   return Math.round(want - probe.left)
 }
 
