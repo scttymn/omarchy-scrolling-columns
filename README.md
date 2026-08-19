@@ -42,7 +42,8 @@ gone. Removing it and reloading returns Hyprland to Omarchy's default of two
 columns.
 
 Requires the scrolling layout on the workspace you want to affect — toggle it
-with `SUPER + L`. The widget dims on tiled (dwindle) workspaces.
+with `SUPER + L`. On tiled (dwindle) workspaces the widget shows a grid icon
+with no count, since a column count means nothing there.
 
 ## Use
 
@@ -74,7 +75,7 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 | `usableWidth` † | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
 | `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
 | `fullscreenOnOneColumn` | `false` | Keeps a lone window at the column width. Set `true` for Hyprland's stock behaviour, where one window spans the whole screen — see below |
-| `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of dimming it |
+| `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of showing the tiled icon |
 
 † `usableWidth` is config-file only — it is deliberately kept out of the
 settings form, for the reason below.
