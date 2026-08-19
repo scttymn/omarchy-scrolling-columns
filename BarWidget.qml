@@ -143,9 +143,20 @@ BarWidget {
   function reassertNow() {
     if (!root.bar || !root.ready || root.workspaceId < 0) return
     var w = root.widthText(root.columns)
-    root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
+    root.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
       + "; hyprctl dispatch "
       + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1")
+  }
+
+  // bar.run goes through Util.execDetached, which spawns a LOGIN shell:
+  // measured at 51ms per invocation against 0.9ms for a plain one, because it
+  // sources the user's profile every time. That dominated the correction path
+  // -- more than the hyprctl calls it was there to make -- so this runs its
+  // own non-login shell. The shell's PATH already carries
+  // /usr/share/omarchy/bin, so every binary still resolves.
+  function run(cmd) {
+    if (!cmd) return
+    Quickshell.execDetached(["bash", "-c", cmd])
   }
 
   function probe() {
@@ -303,7 +314,7 @@ BarWidget {
   // all to avoid a correction the probe now makes within one interval.
   function setDefaultWidth(n) {
     if (!root.bar) return
-    root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
+    root.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
       + " >/dev/null 2>&1")
   }
 
@@ -326,7 +337,7 @@ BarWidget {
     if (root.columnCount === n)
       cmd += "; hyprctl dispatch " + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1"
 
-    root.bar.run(cmd)
+    root.run(cmd)
   }
 
   function setColumns(n) {
@@ -358,7 +369,7 @@ BarWidget {
       cmd += "; hyprctl dispatch "
         + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1"
     }
-    root.bar.run(cmd)
+    root.run(cmd)
     probeSoon.restart()
   }
 
