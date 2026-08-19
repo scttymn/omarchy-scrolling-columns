@@ -310,6 +310,27 @@ BarWidget {
     root.probe()
   }
 
+  // The layout toggle re-evaluates the Hyprland config, which discards
+  // anything set through eval -- verified: column_width drops back to the
+  // config-file value the instant the toggle runs. So a workspace coming back
+  // to scrolling builds its columns at Omarchy's default and visibly snaps
+  // when the next probe corrects it. Chaining the correction into the same
+  // command closes that to one round trip. The anchor is left to the probe,
+  // whose fit is gated on a column count we cannot know until the layout has
+  // actually been rebuilt.
+  function toggleLayout() {
+    if (!root.bar) return
+    var cmd = "omarchy-hyprland-workspace-layout-toggle >/dev/null 2>&1"
+    if (!root.scrolling) {
+      var w = root.widthText(root.columns)
+      cmd += "; hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
+      cmd += "; hyprctl dispatch "
+        + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1"
+    }
+    root.bar.run(cmd)
+    probeSoon.restart()
+  }
+
   function cycleColumns(step) {
     // A dwindle workspace has no columns to count, and the widget shows no
     // number there, so a click or scroll would rewrite the stored count and
@@ -428,10 +449,7 @@ BarWidget {
 
     onPressed: function(b) {
       if (b === Qt.RightButton) root.cycleColumns(-1)
-      else if (b === Qt.MiddleButton) {
-        root.bar.run("omarchy-hyprland-workspace-layout-toggle")
-        probeSoon.restart()
-      }
+      else if (b === Qt.MiddleButton) root.toggleLayout()
       else root.cycleColumns(1)
     }
 
