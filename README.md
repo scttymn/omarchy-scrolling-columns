@@ -73,6 +73,7 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 | `maxColumns` | `6` | Upper bound for the cycle |
 | `usableWidth` † | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
 | `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
+| `fullscreenOnOneColumn` | `true` | Hyprland's default: a lone window spans the whole screen regardless of column width. Turn off to make a single window respect the column width instead |
 | `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of dimming it |
 
 † `usableWidth` is config-file only — it is deliberately kept out of the

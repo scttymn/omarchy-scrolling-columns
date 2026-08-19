@@ -21,11 +21,19 @@ BarWidget {
 
   // One column is what fullscreen_on_one_column already gives you, so the
   // floor is two: below that the widget is just a worse way to fullscreen.
-  readonly property int minColumns: Math.max(1, Number(root.setting("minColumns", 2)))
-  readonly property int maxColumns: Math.max(root.minColumns + 1, Number(root.setting("maxColumns", 6)))
+  readonly property var columnBounds: Model.bounds(root.setting("minColumns", 2),
+                                                   root.setting("maxColumns", 6))
+  readonly property int minColumns: root.columnBounds.min
+  readonly property int maxColumns: root.columnBounds.max
   readonly property int fallbackColumns: root.clampColumns(Number(root.setting("defaultColumns", 2)))
   readonly property int probeIntervalMs: Math.max(500, Number(root.setting("probeIntervalMs", 2000)))
   readonly property bool hideOnDwindle: root.setting("hideOnDwindle", false) === true
+
+  // Hyprland's fullscreen_on_one_column defaults to true, so a lone window
+  // spans the screen no matter what column count is set -- which reads as the
+  // widget being ignored. Exposed here because it is squarely the same
+  // concern, and applied alongside column_width so the two never disagree.
+  readonly property bool fullscreenOnOneColumn: root.setting("fullscreenOnOneColumn", true) === true
 
   // Columns span the full screen by default. Hyprland subtracts gaps and
   // borders from each column's own allotment, so 1/N already fits edge to
@@ -82,7 +90,7 @@ BarWidget {
   Process {
     id: layoutProbe
     running: false
-    command: ["bash", "-lc", root.probeScript]
+    command: ["bash", "-c", root.probeScript]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.applyProbe(text)
@@ -198,10 +206,15 @@ BarWidget {
   // `hyprctl keyword` is rejected outright by the Lua parser ("keyword can't
   // work with non-legacy parsers. Use eval."), so every write goes through
   // eval, and every dispatch through the hl.dsp.* form.
+  function scrollingConfig(widthText) {
+    return "hl.config({ scrolling = { column_width = " + widthText
+      + ", fullscreen_on_one_column = " + (root.fullscreenOnOneColumn ? "true" : "false") + " } })"
+  }
+
   function setDefaultWidth(n) {
     if (!root.bar) return
-    var lua = "hl.config({ scrolling = { column_width = " + root.widthText(n) + " } })"
-    root.bar.run("hyprctl eval " + Util.shellQuote(lua) + " >/dev/null 2>&1")
+    root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
+      + " >/dev/null 2>&1")
   }
 
   // colresize reaches only the focused window's tape, which is exactly the
@@ -231,8 +244,11 @@ BarWidget {
   // this only has to make the compositor boot somewhere sensible.
   function persistReloadDefault(n) {
     if (!root.bar) return
+    // Always the flush width: peek is a transient response to an overflowing
+    // tape, and baking it into the boot default would apply slack before the
+    // widget has seen how many columns actually exist.
     var lua = "-- Written by scttymn.scrolling-columns; edit the widget, not this file.\n"
-      + "hl.config({ scrolling = { column_width = " + root.widthText(n) + " } })\n"
+      + root.scrollingConfig(Model.columnWidthText(n, 1.0, false)) + "\n"
     // Namespaced so two plugins cannot claim the same file in this shared,
     // sourced-wholesale directory -- but with HYPHENS, never dots. require_all
     // strips .lua and calls require() on the rest, so "a.b.lua" is read as the
@@ -273,6 +289,12 @@ BarWidget {
   // waiting for the next count change, so this re-applies the current count
   // at the new width. shell.json hot-reloads, so editing the setting is the
   // whole interaction.
+  onFullscreenOnOneColumnChanged: {
+    if (root.workspaceId < 0) return
+    root.setDefaultWidth(root.columns)
+    root.persistReloadDefault(root.columns)
+  }
+
   onUsableWidthChanged: {
     if (root.workspaceId < 0) return
     root.appliedPeekState = -1
@@ -311,7 +333,10 @@ BarWidget {
       var count = root.columns === 1 ? "1 column" : root.columns + " columns"
       return count + " on workspace " + root.workspaceId
         + (root.pinned ? "" : " (default)")
-        + (root.overflowing ? " \u00b7 " + root.columnCount + " open, peeking" : "")
+        + (root.overflowing
+            ? " \u00b7 " + root.columnCount + " open"
+              + (Model.isPeeking(root.usableWidth, root.overflowing) ? ", peeking" : "")
+            : "")
     }
 
     onPressed: function(b) {

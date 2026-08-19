@@ -97,3 +97,22 @@ test("parseProbe reads layout and count together, or nothing", () => {
   assert.strictEqual(M.parseProbe(null), null)
   assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0 })
 })
+
+test("isPeeking needs slack, not merely an overflowing tape", () => {
+  // Overflowing only decides whether usableWidth is allowed to apply; at the
+  // default of 1 nothing is held back, so nothing is peeking.
+  assert.strictEqual(M.isPeeking(1, true), false)
+  assert.strictEqual(M.isPeeking(1.0, true), false)
+  assert.strictEqual(M.isPeeking(0.94, true), true)
+  // Slack configured but the tape fits: no neighbour to reveal.
+  assert.strictEqual(M.isPeeking(0.94, false), false)
+  assert.strictEqual(M.isPeeking(1, false), false)
+})
+
+test("bounds applies the hard ceiling that the QML properties rely on", () => {
+  // The widget derives minColumns/maxColumns from bounds precisely so a
+  // configured 500 cannot disagree with what the model will actually clamp to.
+  const b = M.bounds(2, 500)
+  assert.strictEqual(b.max, M.HARD_MAX_COLUMNS)
+  assert.strictEqual(M.clampColumns(500, 2, 500), M.HARD_MAX_COLUMNS)
+})

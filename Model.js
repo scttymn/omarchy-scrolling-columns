@@ -44,6 +44,13 @@ function columnWidthText(n, usableWidth, overflowing) {
   return columnWidth(n, usableWidth, overflowing).toFixed(3)
 }
 
+// Overflowing only decides whether usableWidth is allowed to apply. At the
+// default usableWidth of 1 nothing is held back, so an overflowing tape is
+// not peeking and must not be described as though it were.
+function isPeeking(usableWidth, overflowing) {
+  return !!overflowing && Number(usableWidth) < 1
+}
+
 // Wraps at both ends of [min, max] rather than running off to 1.
 function cycleNext(current, step, minColumns, maxColumns) {
   var b = bounds(minColumns, maxColumns)
@@ -115,6 +122,7 @@ if (typeof module !== "undefined") {
     columnWidth: columnWidth,
     columnWidthText: columnWidthText,
     cycleNext: cycleNext,
+    isPeeking: isPeeking,
     isPinned: isPinned,
     parseProbe: parseProbe,
     storedColumns: storedColumns,
