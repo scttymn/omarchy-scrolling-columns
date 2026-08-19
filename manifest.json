@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "scttymn.scrolling-columns",
   "name": "Scrolling Columns",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "author": "scttymn",
   "license": "MIT",
   "description": "Set how many columns fill the screen in Hyprland's scrolling layout, tracked per workspace.",
@@ -28,7 +28,6 @@
       "minColumns": 2,
       "maxColumns": 6,
       "usableWidth": 1.0,
-      "probeIntervalMs": 2000,
       "hideOnDwindle": false,
       "fullscreenOnOneColumn": false
     },
@@ -62,16 +61,6 @@
         "step": 1,
         "defaultValue": 6,
         "description": "Upper bound for the cycle. Pick what stays readable on your display."
-      },
-      {
-        "key": "probeIntervalMs",
-        "type": "integer",
-        "label": "Refresh interval (ms)",
-        "min": 500,
-        "max": 10000,
-        "step": 500,
-        "defaultValue": 2000,
-        "description": "How often to re-read the workspace layout and column count."
       },
       {
         "key": "hideOnDwindle",

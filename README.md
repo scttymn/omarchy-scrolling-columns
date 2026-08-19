@@ -72,7 +72,6 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 | `minColumns` | `2` | Lower bound for the cycle. One column is what `fullscreen_on_one_column` already does, so two is the floor |
 | `maxColumns` | `6` | Upper bound for the cycle |
 | `usableWidth` † | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
-| `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
 | `fullscreenOnOneColumn` | `false` | Keeps a lone window at the column width. Set `true` for Hyprland's stock behaviour, where one window spans the whole screen — see below |
 | `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of showing the tiled icon |
 
@@ -152,6 +151,18 @@ Expect one extra `hyprctl` poll every `probeIntervalMs` per additional
 display. This has been reasoned through rather than tested on real hardware;
 if you run multiple monitors and see the widgets disagree, please open an
 issue.
+
+## How it stays in sync
+
+The widget is event driven — it does not poll. Hyprland announces everything
+it reacts to: `configreloaded` fires the instant a layout toggle or a
+`hyprctl reload` re-evaluates the config, which is exactly when a width set
+through `eval` is discarded, and `openwindow`/`closewindow`/`movewindow` cover
+every change to the column count.
+
+The one blind spot is `promote` and `consume_or_expel`, which rearrange
+columns through `layoutmsg` and emit nothing. That leaves only the tooltip's
+live count stale; the number on the bar is your setting, not a measurement.
 
 ## Development
 

@@ -26,7 +26,6 @@ BarWidget {
   readonly property int minColumns: root.columnBounds.min
   readonly property int maxColumns: root.columnBounds.max
   readonly property int fallbackColumns: root.clampColumns(Number(root.setting("defaultColumns", 2)))
-  readonly property int probeIntervalMs: Math.max(500, Number(root.setting("probeIntervalMs", 2000)))
   readonly property bool hideOnDwindle: root.setting("hideOnDwindle", false) === true
 
   // Hyprland's fullscreen_on_one_column defaults to true, so a lone window
@@ -131,6 +130,23 @@ BarWidget {
       + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1")
   }
 
+  // Every state this widget reacts to is announced. Polling for the
+  // consequence instead of listening for the cause meant a subprocess every
+  // couple of seconds forever, whether or not anything had changed, while the
+  // work it guarded costs a few milliseconds and happens rarely.
+  //
+  // The one blind spot is promote / consume_or_expel: they rearrange columns
+  // through layoutmsg, which emits nothing. That only leaves columnCount
+  // stale, which decorates the tooltip and gates the anchoring fit -- and
+  // every path that acts on it probes first.
+  readonly property var watchedEvents: ({
+    configreloaded: true,   // layout toggle, hyprctl reload: discards eval'd config
+    openwindow: true,       // adds a column
+    closewindow: true,      // removes one
+    movewindow: true,       // moves one between workspaces
+    movewindowv2: true
+  })
+
   // Hyprland emits configreloaded the instant a layout toggle or a reload
   // re-evaluates the config -- which is exactly when the width set through
   // eval is discarded. Reacting to it beats waiting up to a probe interval,
@@ -138,7 +154,14 @@ BarWidget {
   Connections {
     target: Hyprland
     function onRawEvent(event) {
-      if (String(event.name) !== "configreloaded") return
+      var name = String(event.name)
+      if (!root.watchedEvents[name]) return
+      if (name !== "configreloaded") {
+        // A column was added or removed. Nothing to re-assert -- the widths
+        // are already right -- but the tape may need re-anchoring.
+        root.probe()
+        return
+      }
       // Correct first, ask questions after. Everything needed is already in
       // memory -- the focused workspace is reactive and the count comes from
       // the loaded store -- so waiting for a probe to confirm the layout only
@@ -246,14 +269,6 @@ BarWidget {
     return ws && ws.toplevels ? ws.toplevels.values.length : 0
   }
   onToplevelCountChanged: root.probe()
-
-  Timer {
-    interval: root.probeIntervalMs
-    running: true
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: root.probe()
-  }
 
   // ----------------------------------------------------------------- state
 
