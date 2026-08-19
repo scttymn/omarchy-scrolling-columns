@@ -212,10 +212,30 @@ BarWidget {
       + ", fullscreen_on_one_column = " + (root.fullscreenOnOneColumn ? "true" : "false") + " } })"
   }
 
+  // Applying the live config and writing the reload file are one command on
+  // purpose. As two, the file only tracked change events, so it drifted any
+  // time the effective value moved without one -- a settings default changing
+  // under it, or a fresh install where nobody ever touches a setting and no
+  // file is written at all, losing the column count on the next reload.
   function setDefaultWidth(n) {
     if (!root.bar) return
+    var dir = root.stateHome + "/toggles/hypr"
+    // Namespaced so two plugins cannot claim the same file in this shared,
+    // sourced-wholesale directory -- but with HYPHENS, never dots. require_all
+    // strips .lua and calls require() on the rest, so "a.b.lua" is read as the
+    // Lua module path a/b and fails to resolve, which aborts the whole
+    // default.hypr.toggles load and takes every other toggle down with it.
+    var path = dir + "/scttymn-scrolling-columns.lua"
+
+    // The reload baseline is always the flush width: peek is a transient
+    // response to an overflowing tape, and baking it into the boot default
+    // would apply slack before the widget has seen how many columns exist.
+    var persisted = "-- Written by scttymn.scrolling-columns; edit the widget, not this file.\n"
+      + root.scrollingConfig(Model.columnWidthText(n, 1.0, false)) + "\n"
+
     root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
-      + " >/dev/null 2>&1")
+      + " >/dev/null 2>&1; mkdir -p " + Util.shellQuote(dir)
+      + " && printf '%s' " + Util.shellQuote(persisted) + " > " + Util.shellQuote(path))
   }
 
   // colresize reaches only the focused window's tape, which is exactly the
@@ -240,26 +260,6 @@ BarWidget {
     root.bar.run(cmd)
   }
 
-  // Survives `hyprctl reload`, which discards anything set through eval.
-  // Per-workspace values are restored by the widget as you focus each one;
-  // this only has to make the compositor boot somewhere sensible.
-  function persistReloadDefault(n) {
-    if (!root.bar) return
-    // Always the flush width: peek is a transient response to an overflowing
-    // tape, and baking it into the boot default would apply slack before the
-    // widget has seen how many columns actually exist.
-    var lua = "-- Written by scttymn.scrolling-columns; edit the widget, not this file.\n"
-      + root.scrollingConfig(Model.columnWidthText(n, 1.0, false)) + "\n"
-    // Namespaced so two plugins cannot claim the same file in this shared,
-    // sourced-wholesale directory -- but with HYPHENS, never dots. require_all
-    // strips .lua and calls require() on the rest, so "a.b.lua" is read as the
-    // Lua module path a/b and fails to resolve, which aborts the whole
-    // default.hypr.toggles load and takes every other toggle down with it.
-    var path = root.stateHome + "/toggles/hypr/scttymn-scrolling-columns.lua"
-    root.bar.run("mkdir -p " + Util.shellQuote(root.stateHome + "/toggles/hypr")
-      + " && printf '%s' " + Util.shellQuote(lua) + " > " + Util.shellQuote(path))
-  }
-
   function setColumns(n) {
     var clamped = root.clampColumns(n)
     if (clamped === root.fallbackColumns) root.forgetColumns(root.workspaceId)
@@ -269,7 +269,6 @@ BarWidget {
     root.appliedPeekState = (root.columnCount > clamped) ? 1 : 0
     setDefaultWidth(clamped)
     resizeExistingColumns(clamped)
-    persistReloadDefault(clamped)
     root.probe()
   }
 
@@ -291,9 +290,7 @@ BarWidget {
   // at the new width. shell.json hot-reloads, so editing the setting is the
   // whole interaction.
   onFullscreenOnOneColumnChanged: {
-    if (root.workspaceId < 0) return
-    root.setDefaultWidth(root.columns)
-    root.persistReloadDefault(root.columns)
+    if (root.workspaceId >= 0) root.setDefaultWidth(root.columns)
   }
 
   onUsableWidthChanged: {
@@ -301,7 +298,6 @@ BarWidget {
     root.appliedPeekState = -1
     setDefaultWidth(root.columns)
     resizeExistingColumns(root.columns)
-    persistReloadDefault(root.columns)
     root.probe()
   }
 
