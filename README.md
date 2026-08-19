@@ -21,6 +21,26 @@ whenever focus moves. The click target is just how you pick the number.
 omarchy plugin add https://github.com/scttymn/omarchy-scrolling-columns.git --enable
 ```
 
+### Removing
+
+```bash
+omarchy plugin remove scttymn.scrolling-columns
+```
+
+That removes the plugin and its bar entry. It does not touch the two files it
+wrote, so delete those too if you want it gone completely:
+
+```bash
+rm -f ~/.local/state/omarchy/scttymn.scrolling-columns.json
+rm -f ~/.local/state/omarchy/toggles/hypr/scttymn-scrolling-columns.lua
+hyprctl reload
+```
+
+The second file is the one that matters — it sets `scrolling:column_width`, so
+leaving it behind keeps your last column count applied after the widget is
+gone. Removing it and reloading returns Hyprland to Omarchy's default of two
+columns.
+
 Requires the scrolling layout on the workspace you want to affect — toggle it
 with `SUPER + L`. The widget dims on tiled (dwindle) workspaces.
 
@@ -51,9 +71,12 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 | `defaultColumns` | `2` | Column count for workspaces with no explicit setting. Matches stock Omarchy, which ships `column_width = 0.49` — two columns |
 | `minColumns` | `2` | Lower bound for the cycle. One column is what `fullscreen_on_one_column` already does, so two is the floor |
 | `maxColumns` | `6` | Upper bound for the cycle |
-| `usableWidth` | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
+| `usableWidth` † | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
 | `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
 | `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of dimming it |
+
+† `usableWidth` is config-file only — it is deliberately kept out of the
+settings form, for the reason below.
 
 ### Edge peek
 
@@ -96,6 +119,17 @@ this one touches:
   module path, fails to resolve, and takes every other toggle down with it.
 - It shells out to `hyprctl eval` and `hyprctl dispatch` to apply widths, and to
   `omarchy-hyprland-workspace-layout-toggle` on middle click.
+
+## Development
+
+Column arithmetic lives in `Model.js`, kept Qt-free so it can be tested without
+running a desktop:
+
+```bash
+npm test
+```
+
+`BarWidget.qml` handles everything that needs Qt or a compositor.
 
 ## License
 

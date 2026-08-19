@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import qs.Commons
 import qs.Ui
+import "Model.js" as Model
 
 // How many columns fill the screen in Hyprland's scrolling layout.
 //
@@ -32,9 +33,7 @@ BarWidget {
   readonly property real usableWidth: Number(root.setting("usableWidth", 1.0))
 
   function clampColumns(n) {
-    var v = Math.round(Number(n))
-    if (!(v >= 1)) v = root.minColumns
-    return Math.max(root.minColumns, Math.min(root.maxColumns, v))
+    return Model.clampColumns(n, root.minColumns, root.maxColumns)
   }
 
   readonly property string home: Quickshell.env("HOME") || ""
@@ -95,8 +94,7 @@ BarWidget {
   }
 
   function applyProbe(output) {
-    var parsed = null
-    try { parsed = JSON.parse(String(output || "")) } catch (e) { return }
+    var parsed = Model.parseProbe(output)
     if (!parsed) return
     // Layout and column count come from one sample and must both land before
     // anything reacts to either. Assigning the layout first let the scrolling
@@ -105,8 +103,8 @@ BarWidget {
     // column origins), so a three-column workspace saw 3 === 3, ran "fit all"
     // against four real columns, and squeezed them all onto the screen.
     var wasScrolling = root.scrolling
-    root.columnCount = Number(parsed.columns) || 0
-    root.tiledLayout = String(parsed.layout || "")
+    root.columnCount = parsed.columns
+    root.tiledLayout = parsed.layout
 
     // A workspace becoming scrolling has to re-assert width and anchor:
     // syncPeek only fires on a peek transition, which never happens with edge
@@ -162,10 +160,7 @@ BarWidget {
     root.revision
     if (id < 0) return root.fallbackColumns
     var map = store.adapter ? store.adapter.workspaces : null
-    var value = map ? map[String(id)] : undefined
-    var n = Number(value)
-    if (!(n >= 1)) return root.fallbackColumns
-    return root.clampColumns(n)
+    return Model.storedColumns(map, id, root.fallbackColumns, root.minColumns, root.maxColumns)
   }
 
   readonly property int columns: storedColumns(workspaceId)
@@ -177,42 +172,27 @@ BarWidget {
   readonly property bool pinned: {
     root.revision
     if (root.workspaceId < 0 || !store.adapter) return false
-    var map = store.adapter.workspaces || {}
-    return map[String(root.workspaceId)] !== undefined
+    return Model.isPinned(store.adapter.workspaces, root.workspaceId)
   }
 
   function rememberColumns(id, n) {
     if (id < 0 || !store.adapter) return
-    var next = {}
-    var map = store.adapter.workspaces || {}
-    for (var key in map) next[key] = map[key]
-    next[String(id)] = n
-    store.adapter.workspaces = next
+    store.adapter.workspaces = Model.withWorkspace(store.adapter.workspaces, id, n)
     store.writeAdapter()
     root.revision++
   }
 
   function forgetColumns(id) {
     if (id < 0 || !store.adapter) return
-    var next = {}
-    var map = store.adapter.workspaces || {}
-    for (var key in map) {
-      if (key !== String(id)) next[key] = map[key]
-    }
-    store.adapter.workspaces = next
+    store.adapter.workspaces = Model.withoutWorkspace(store.adapter.workspaces, id)
     store.writeAdapter()
     root.revision++
   }
 
   // ----------------------------------------------------------------- apply
 
-  function widthFor(n) {
-    var span = root.overflowing ? root.usableWidth : 1.0
-    return Math.max(0.05, Math.min(1, span / Math.max(1, n)))
-  }
-
   function widthText(n) {
-    return widthFor(n).toFixed(3)
+    return Model.columnWidthText(n, root.usableWidth, root.overflowing)
   }
 
   // `hyprctl keyword` is rejected outright by the Lua parser ("keyword can't
@@ -268,7 +248,7 @@ BarWidget {
     if (clamped === root.fallbackColumns) root.forgetColumns(root.workspaceId)
     else root.rememberColumns(root.workspaceId, clamped)
     // Changing the target can itself cross the threshold, so the width used
-    // here is whatever widthFor decides for the new count.
+    // here is whatever Model.columnWidth decides for the new count.
     root.appliedPeekState = (root.columnCount > clamped) ? 1 : 0
     setDefaultWidth(clamped)
     resizeExistingColumns(clamped)
@@ -277,10 +257,7 @@ BarWidget {
   }
 
   function cycleColumns(step) {
-    var next = root.columns + step
-    if (next > root.maxColumns) next = root.minColumns
-    if (next < root.minColumns) next = root.maxColumns
-    setColumns(next)
+    setColumns(Model.cycleNext(root.columns, step, root.minColumns, root.maxColumns))
   }
 
   // Focus moved to another workspace: hand the compositor that workspace's
