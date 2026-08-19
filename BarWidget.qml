@@ -366,7 +366,9 @@ BarWidget {
     Row {
       id: content
       anchors.centerIn: parent
-      spacing: root.scrolling ? Style.space(1) : 0
+      // space(1) leaves only 2px between the icon's ink and the digit's, which
+      // reads as the two colliding rather than as icon-plus-count.
+      spacing: root.scrolling ? Style.space(2) : 0
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
@@ -383,7 +385,9 @@ BarWidget {
         text: root.columns
         color: button.foreground
         font.family: button.fontFamily
-        font.pixelSize: button.fontSize
+        // A count at body size stands nearly as tall as the icon and competes
+        // with it; the icon is the subject and the number annotates it.
+        font.pixelSize: Style.font.bodySmall
         renderType: Text.NativeRendering
       }
     }
