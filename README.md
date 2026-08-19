@@ -15,6 +15,19 @@ reads `scrolling:column_width` with no workspace context.
 So the widget's real job is re-pointing that one global at the active workspace
 whenever focus moves. The click target is just how you pick the number.
 
+## Requirements
+
+- **Omarchy Quattro** with the Omarchy shell (the widget is a Quickshell bar
+  widget)
+- **Hyprland** with its `scrolling` layout — toggle a workspace into it with
+  `SUPER + L`
+- `hyprctl`, `jq`, and `bash`, all of which ship with Omarchy. The widget
+  shells out to `hyprctl` to read and apply compositor state, pipes it through
+  `jq`, and runs `omarchy-hyprland-workspace-layout-toggle` on middle click.
+
+No other external dependencies, and nothing is installed or downloaded at
+runtime.
+
 ## Install
 
 ```bash
@@ -93,7 +106,7 @@ omarchy bar set scttymn.scrolling-columns fullscreenOnOneColumn true
 ```
 
 The plugin applies this alongside `column_width`, so the two can never
-disagree, and it is written to the reload file so it survives `hyprctl reload`.
+disagree, and re-applies both when Hyprland discards them on a reload.
 
 ### Edge peek
 
