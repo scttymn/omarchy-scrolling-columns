@@ -276,6 +276,28 @@ BarWidget {
       + " >/dev/null 2>&1")
   }
 
+  // colresize reaches only the focused window's tape, which is exactly the
+  // per-workspace behaviour we want. It early-returns when nothing is
+  // focused, so an empty workspace records intent and lets the default above
+  // catch the first window that opens there.
+  function resizeExistingColumns(n) {
+    if (!root.bar || !root.scrolling) return
+    var lua = "hl.dsp.layout(\"colresize all " + root.widthText(n) + "\")"
+    var cmd = "hyprctl dispatch " + Util.shellQuote(lua) + " >/dev/null 2>&1"
+
+    // Resizing columns does not move the viewport, so an offset left over from
+    // the previous widths survives and shows up as a gap at the leading edge
+    // with the last column cut off. Nothing re-anchors it on its own:
+    // fit_into_view is a no-op, move does not clamp at the start of the tape,
+    // and fit tobeg widens the columns. When the column count already equals
+    // the target, every column fits, so "fit all" recomputes exactly the
+    // widths we just set and re-anchors as a side effect -- a pure snap.
+    if (root.columnCount === n)
+      cmd += "; hyprctl dispatch " + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1"
+
+    root.bar.run(cmd)
+  }
+
   function setColumns(n) {
     var clamped = root.clampColumns(n)
     if (clamped === root.fallbackColumns) root.forgetColumns(root.workspaceId)
