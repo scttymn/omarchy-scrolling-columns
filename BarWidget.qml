@@ -340,10 +340,19 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.scrolling ? (root.glyph + " " + root.columns) : root.glyph
+
+    // The glyph and the count are drawn separately so the icon can sit at
+    // Style.bar.iconFont -- the size every BarIconButton on the bar uses --
+    // while the number stays at the smaller body size. WidgetButton's single
+    // label would otherwise force both to one size, leaving this icon visibly
+    // smaller than the stock widgets beside it.
+    labelVisible: false
+    hasVisualContent: true
+    fixedWidth: content.implicitWidth + button.scaledHorizontalMargin * 2
+
     tooltipText: {
       if (!root.scrolling)
-        return "Workspace " + root.workspaceId + " is tiled · middle click or SUPER + L for scrolling"
+        return "Workspace " + root.workspaceId + " is tiled \u00b7 middle click or SUPER + L for scrolling"
       var count = root.columns === 1 ? "1 column" : root.columns + " columns"
       return count + " on workspace " + root.workspaceId
         + (root.pinned ? "" : " (default)")
@@ -351,6 +360,31 @@ BarWidget {
             ? " \u00b7 " + root.columnCount + " open"
               + (Model.isPeeking(root.usableWidth, root.overflowing) ? ", peeking" : "")
             : "")
+    }
+
+    Row {
+      id: content
+      anchors.centerIn: parent
+      spacing: root.scrolling ? Style.space(1) : 0
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.glyph
+        color: button.foreground
+        font.family: button.fontFamily
+        font.pixelSize: Style.bar.iconFont
+        renderType: Text.NativeRendering
+      }
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.scrolling
+        text: root.columns
+        color: button.foreground
+        font.family: button.fontFamily
+        font.pixelSize: button.fontSize
+        renderType: Text.NativeRendering
+      }
     }
 
     onPressed: function(b) {
