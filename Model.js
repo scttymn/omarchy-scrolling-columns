@@ -72,7 +72,7 @@ function parseOptions(text) {
   }
   if (objects.length === 0) return null
 
-  var out = { columnWidth: null, fullscreenOnOneColumn: null }
+  var out = { columnWidth: null, fullscreenOnOneColumn: null, gapsOut: "", borderSize: null }
   for (var j = 0; j < objects.length; j++) {
     var o = objects[j]
     var name = String(o.option || "")
@@ -80,8 +80,15 @@ function parseOptions(text) {
       out.columnWidth = o.float
     else if (name === "scrolling:fullscreen_on_one_column" && typeof o.bool === "boolean")
       out.fullscreenOnOneColumn = o.bool
+    // Read live rather than assumed: a theme can change either, and the theme
+    // switch triggers the configreloaded this widget already listens for.
+    else if (name === "general:gaps_out" && typeof o.css === "string")
+      out.gapsOut = o.css
+    else if (name === "general:border_size" && typeof o.int === "number")
+      out.borderSize = o.int
   }
-  return (out.columnWidth === null && out.fullscreenOnOneColumn === null) ? null : out
+  return (out.columnWidth === null && out.fullscreenOnOneColumn === null
+    && out.borderSize === null && out.gapsOut === "") ? null : out
 }
 
 // Compared at the precision actually written, since the value goes to Hyprland
@@ -94,19 +101,57 @@ function optionsMatch(live, wantedWidthText, wantedFullscreen) {
   return true
 }
 
-// A row whose column count matches the target fits by construction, so it must
-// sit inside the monitor. Hanging off either edge means the tape is scrolled
-// somewhere it has no business being. Above the target it is legitimately
-// scrolled; below it, a fit would stretch the columns instead of moving them.
-function needsAnchor(probe, targetColumns) {
-  if (!probe || probe.layout !== "scrolling") return false
+// How far the row must be panned so it is not scrolled past either of its own
+// ends, in logical pixels. Zero means it is already somewhere valid.
+//
+// This is a clamp, not a fit: it moves the row without resizing it, so it
+// needs no knowledge of the target column count. A fit had to be gated on the
+// count matching, because with fewer columns than the target it would stretch
+// them to fill the screen instead of moving them -- which left the two cases
+// either side of that gate uncorrected. Leaving fullscreen is one of them:
+// Hyprland puts the restored column at the leading edge, which on a row that
+// overflows can scroll clean past the end and strand dead space at the far
+// side.
+//
+// Valid positions run from flush-left (left == margin) to flush-right
+// (right == width - margin). A row that fits has only one: flush left.
+function anchorDelta(probe, margin) {
+  if (!probe || probe.layout !== "scrolling") return 0
   // A fullscreen window spans the monitor and is not part of the row, so the
-  // extents describe something else entirely. Fitting here would drag it back
-  // into a column.
-  if (probe.fullscreen) return false
-  if (probe.columns !== targetColumns) return false
-  if (!(probe.width > 0)) return false
-  return probe.left < 0 || probe.right > probe.width
+  // extents describe something that is not the row.
+  if (probe.fullscreen) return 0
+  if (!(probe.width > 0) || probe.columns < 1) return 0
+
+  var rowWidth = probe.right - probe.left
+  if (!(rowWidth > 0)) return 0
+
+  var maxLeft = margin                              // flush left
+  var minLeft = probe.width - margin - rowWidth     // flush right
+  if (minLeft > maxLeft) minLeft = maxLeft          // fits: flush left is the only valid spot
+
+  var want = Math.min(maxLeft, Math.max(minLeft, probe.left))
+  return Math.round(want - probe.left)
+}
+
+// gaps_out arrives as css shorthand, so the leading-edge gap is not simply the
+// first number: 1 value sets all sides, 2 is vertical/horizontal, 3 is
+// top/horizontal/bottom, and 4 is top/right/bottom/left. Taking [0] is only
+// correct when every side happens to match, which is exactly the case that
+// hides the mistake. Nothing here is hardcoded -- gaps and border are read
+// back from Hyprland on every probe, so a theme that changes them is picked up
+// on the configreloaded it already triggers.
+function marginFrom(gapsOutCss, borderSize) {
+  var parts = String(gapsOutCss || "").trim().split(/\s+/)
+    .map(Number).filter(function (n) { return isFinite(n) && n >= 0 })
+
+  var gap = 0
+  if (parts.length === 1) gap = parts[0]
+  else if (parts.length === 2 || parts.length === 3) gap = parts[1]   // horizontal
+  else if (parts.length >= 4) gap = parts[3]                          // left
+
+  var border = Number(borderSize)
+  if (!isFinite(border) || border < 0) border = 0
+  return gap + border
 }
 
 function isPeeking(usableWidth, overflowing) {
@@ -192,7 +237,8 @@ if (typeof module !== "undefined") {
     columnWidthText: columnWidthText,
     cycleNext: cycleNext,
     isPeeking: isPeeking,
-    needsAnchor: needsAnchor,
+    anchorDelta: anchorDelta,
+    marginFrom: marginFrom,
     optionsMatch: optionsMatch,
     parseOptions: parseOptions,
     isPinned: isPinned,

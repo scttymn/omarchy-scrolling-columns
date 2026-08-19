@@ -107,7 +107,8 @@ BarWidget {
     'ws=$(hyprctl activeworkspace -j) || exit 0; '
     + 'mon=$(hyprctl monitors -j); '
     + 'opts=$(hyprctl -j --batch "getoption scrolling:column_width ; '
-    + 'getoption scrolling:fullscreen_on_one_column" | tr -d "\\n"); '
+    + 'getoption scrolling:fullscreen_on_one_column ; '
+    + 'getoption general:gaps_out ; getoption general:border_size" | tr -d "\\n"); '
     + 'hyprctl clients -j | jq -c --argjson ws "$ws" --argjson mon "$mon" --arg opts "$opts" '
     + "'[ .[] | select(.workspace.id == $ws.id and .floating == false and .mapped == true) ] as $w |"
     + " ($w | sort_by(.at[0])) as $s |"
@@ -132,9 +133,15 @@ BarWidget {
   // Rather than enumerate the things that scroll it -- a colresize, a window
   // opening, leaving fullscreen -- detect the state itself and snap it back.
   function anchorIfAdrift(parsed) {
-    if (!Model.needsAnchor(parsed, root.columns)) return
+    var live = Model.parseOptions(parsed.opts)
+    if (!live) return
+    var delta = Model.anchorDelta(parsed, Model.marginFrom(live.gapsOut, live.borderSize))
+    if (Math.abs(delta) < 1) return
+    // A pan, not a fit: this must not resize anything, only slide the row back
+    // inside its own ends.
+    var arg = (delta > 0 ? "+" : "") + delta
     root.run("hyprctl dispatch "
-      + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1")
+      + Util.shellQuote("hl.dsp.layout(\"move " + arg + "\")") + " >/dev/null 2>&1")
   }
 
   // Every state this widget reacts to is announced. Polling for the

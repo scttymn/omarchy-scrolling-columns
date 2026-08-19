@@ -136,11 +136,24 @@ test("bounds applies the hard ceiling that the QML properties rely on", () => {
 test("parseOptions reads hyprctl --batch's concatenated objects", () => {
   const batch = '{"option": "scrolling:column_width", "float": 0.333000, "set": true }'
               + '{"option": "scrolling:fullscreen_on_one_column", "bool": false, "set": true }'
-  assert.deepStrictEqual(M.parseOptions(batch), { columnWidth: 0.333, fullscreenOnOneColumn: false })
+  assert.deepStrictEqual(M.parseOptions(batch),
+    { columnWidth: 0.333, fullscreenOnOneColumn: false, gapsOut: "", borderSize: null })
   // Order is not assumed; each object carries its own name.
   const reversed = '{"option": "scrolling:fullscreen_on_one_column", "bool": true, "set": true }'
                  + '{"option": "scrolling:column_width", "float": 0.5, "set": true }'
-  assert.deepStrictEqual(M.parseOptions(reversed), { columnWidth: 0.5, fullscreenOnOneColumn: true })
+  assert.deepStrictEqual(M.parseOptions(reversed),
+    { columnWidth: 0.5, fullscreenOnOneColumn: true, gapsOut: "", borderSize: null })
+
+  // Gaps and border ride along in the same batch so the anchor margin is read
+  // rather than assumed -- a theme can change either.
+  const full = '{"option": "scrolling:column_width", "float": 0.333, "set": true }'
+             + '{"option": "scrolling:fullscreen_on_one_column", "bool": false, "set": true }'
+             + '{"option": "general:gaps_out", "css": "10 10 10 10", "set": true }'
+             + '{"option": "general:border_size", "int": 2, "set": true }'
+  const live = M.parseOptions(full)
+  assert.strictEqual(live.gapsOut, "10 10 10 10")
+  assert.strictEqual(live.borderSize, 2)
+  assert.strictEqual(M.marginFrom(live.gapsOut, live.borderSize), 12)
   assert.strictEqual(M.parseOptions(""), null)
   assert.strictEqual(M.parseOptions("not json"), null)
   assert.strictEqual(M.parseOptions('{"option":"something:else","float":1}'), null)
@@ -156,33 +169,38 @@ test("optionsMatch compares at the precision actually written", () => {
   assert.strictEqual(M.optionsMatch({ columnWidth: null, fullscreenOnOneColumn: false }, "0.333", false), false)
 })
 
-test("needsAnchor spots a row that fits but hangs off an edge", () => {
-  const fits = { layout: "scrolling", columns: 3, left: 12, right: 2996, width: 3008 }
-  assert.strictEqual(M.needsAnchor(fits, 3), false, "flush row needs nothing")
+test("anchorDelta clamps a row inside its own ends", () => {
+  const W = 3008, m = 12
+  const row = (left, right, columns = 4) => ({ layout: "scrolling", columns, left, right, width: W })
 
-  // Leaving fullscreen scrolled the row left: three columns, first off-screen.
-  assert.strictEqual(
-    M.needsAnchor({ ...fits, left: -984, right: 2000 }, 3), true)
-  // A colresize shifted it right: last column past the far edge.
-  assert.strictEqual(
-    M.needsAnchor({ ...fits, left: 386, right: 3370 }, 3), true)
+  assert.strictEqual(M.anchorDelta(row(12, 2996, 3), m), 0, "flush and fitting")
+  assert.strictEqual(M.anchorDelta(row(-990, 2996), m), 0, "overflowing but validly scrolled")
 
-  // More columns than the target: the tape is legitimately scrolled.
-  assert.strictEqual(
-    M.needsAnchor({ ...fits, columns: 5, left: -984, right: 2000 }, 3), false)
-  // Fewer than the target: a fit would stretch the columns, not move them.
-  assert.strictEqual(
-    M.needsAnchor({ ...fits, columns: 2, left: -984, right: 2000 }, 3), false)
+  // Leaving fullscreen put the restored column at the leading edge and scrolled
+  // the row clean past its end, stranding dead space at the far side.
+  assert.strictEqual(M.anchorDelta(row(-1990, 2000), m), 996)
+  // A colresize shifted it the other way, past the beginning.
+  assert.strictEqual(M.anchorDelta(row(386, 3370), m), -374)
+  // Fits but drifted: only one valid position, flush left.
+  assert.strictEqual(M.anchorDelta(row(-984, 2000, 3), m), 996)
 
-  assert.strictEqual(M.needsAnchor({ ...fits, layout: "dwindle", left: -984 }, 3), false)
-  assert.strictEqual(M.needsAnchor({ ...fits, width: 0, left: -984 }, 3), false, "no monitor width, no judgement")
-  assert.strictEqual(M.needsAnchor(null, 3), false)
+  assert.strictEqual(M.anchorDelta(row(-984, 2000, 2), m), 996, "fewer columns than target still clamps")
+  assert.strictEqual(M.anchorDelta({ ...row(-984, 2000), layout: "dwindle" }, m), 0)
+  assert.strictEqual(M.anchorDelta({ ...row(-984, 2000), width: 0 }, m), 0)
+  assert.strictEqual(M.anchorDelta(null, m), 0)
 })
 
-test("needsAnchor stands down while a window is fullscreen", () => {
-  // A fullscreen window spans the monitor, so the row's extents describe
-  // something that is not the row. Fitting drags it back into a column.
+test("anchorDelta stands down while a window is fullscreen", () => {
   const adrift = { layout: "scrolling", columns: 3, left: -984, right: 2000, width: 3008 }
-  assert.strictEqual(M.needsAnchor(adrift, 3), true)
-  assert.strictEqual(M.needsAnchor({ ...adrift, fullscreen: true }, 3), false)
+  assert.strictEqual(M.anchorDelta(adrift, 12), 996)
+  assert.strictEqual(M.anchorDelta({ ...adrift, fullscreen: true }, 12), 0)
+})
+
+test("marginFrom reads css shorthand rather than assuming symmetry", () => {
+  assert.strictEqual(M.marginFrom("10", 2), 12)
+  assert.strictEqual(M.marginFrom("10 20", 2), 22, "vertical/horizontal")
+  assert.strictEqual(M.marginFrom("10 20 30", 2), 22, "top/horizontal/bottom")
+  assert.strictEqual(M.marginFrom("10 20 30 40", 2), 42, "top/right/bottom/left")
+  assert.strictEqual(M.marginFrom("10 10 10 10", 2), 12, "the symmetric case that hid the bug")
+  assert.strictEqual(M.marginFrom("", undefined), 0)
 })
