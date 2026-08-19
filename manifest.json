@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "scttymn.scrolling-columns",
   "name": "Scrolling Columns",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "author": "scttymn",
   "license": "MIT",
   "description": "Set how many columns fill the screen in Hyprland's scrolling layout, tracked per workspace.",

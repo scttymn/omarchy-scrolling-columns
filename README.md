@@ -71,6 +71,35 @@ Setting a workspace to the default count *unpins* it rather than storing an
 identical override, so it keeps following `defaultColumns` if you change that
 later. The tooltip shows which state you are in.
 
+## Fullscreen
+
+Hyprland's scrolling layout does not lift a fullscreen window out of the row.
+It resizes that column to the full width of the monitor and scrolls the tape so
+the column sits at the leading edge — `hyprctl clients` reports
+`fullscreenHandler: "scrolling"` while it is up. The other columns keep their
+order and spacing and simply slide.
+
+The consequence is that leaving fullscreen strands the row somewhere you never
+put it: the formerly-fullscreen column ends up leading, so a workspace showing
+columns one to three comes back showing two to four.
+
+The widget puts it back. Because the column stays part of the row, the original
+offset is still encoded in the surviving columns *while* you are fullscreen —
+the leftmost survivor, plus one column pitch for each column that precedes the
+fullscreen one. That is the only workable moment to read it: panning emits no
+Hyprland event, so anything recorded earlier is stale, and Hyprland repositions
+the row within about 14ms of announcing the change.
+
+This covers both a fullscreen dispatcher and an application's own fullscreen
+button. The dispatcher accepts `layout_aware = false`, which avoids the whole
+behaviour by using Hyprland's default handler, but a client's fullscreen
+request never goes through a dispatcher and has no equivalent opt-out.
+
+One case is deliberately left alone: if the fullscreen column was already the
+leading one, the shift that moved it to the edge was the row's entire offset,
+so nothing survives to recover — and nothing needs to, since a column that led
+before leads again after.
+
 ## Settings
 
 Set them in `~/.config/omarchy/shell.json`, or with `omarchy bar set`:
@@ -91,7 +120,7 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 † `usableWidth` is config-file only — it is deliberately kept out of the
 settings form, for the reason below.
 
-### Restoring the fullscreen single window
+### Single window filling the screen
 
 Hyprland's `scrolling:fullscreen_on_one_column` defaults to `true`, so a lone
 window spans the whole screen no matter what column width is set. This plugin
