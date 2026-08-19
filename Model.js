@@ -94,6 +94,17 @@ function optionsMatch(live, wantedWidthText, wantedFullscreen) {
   return true
 }
 
+// A row whose column count matches the target fits by construction, so it must
+// sit inside the monitor. Hanging off either edge means the tape is scrolled
+// somewhere it has no business being. Above the target it is legitimately
+// scrolled; below it, a fit would stretch the columns instead of moving them.
+function needsAnchor(probe, targetColumns) {
+  if (!probe || probe.layout !== "scrolling") return false
+  if (probe.columns !== targetColumns) return false
+  if (!(probe.width > 0)) return false
+  return probe.left < 0 || probe.right > probe.width
+}
+
 function isPeeking(usableWidth, overflowing) {
   return !!overflowing && Number(usableWidth) < 1
 }
@@ -157,6 +168,9 @@ function parseProbe(text) {
   return {
     layout: String(parsed.layout || ""),
     columns: Number(parsed.columns) || 0,
+    left: Number(parsed.left) || 0,
+    right: Number(parsed.right) || 0,
+    width: Number(parsed.width) || 0,
     // What Hyprland actually has, for the drift check. Raw text: parsed by
     // parseOptions, which handles hyprctl --batch's concatenated objects.
     opts: String(parsed.opts || "")
@@ -173,6 +187,7 @@ if (typeof module !== "undefined") {
     columnWidthText: columnWidthText,
     cycleNext: cycleNext,
     isPeeking: isPeeking,
+    needsAnchor: needsAnchor,
     optionsMatch: optionsMatch,
     parseOptions: parseOptions,
     isPinned: isPinned,

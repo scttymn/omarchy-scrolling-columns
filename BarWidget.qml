@@ -99,12 +99,17 @@ BarWidget {
   // derived from distinct column origins rather than from toplevel count.
   readonly property string probeScript:
     'ws=$(hyprctl activeworkspace -j) || exit 0; '
+    + 'mon=$(hyprctl monitors -j); '
     + 'opts=$(hyprctl -j --batch "getoption scrolling:column_width ; '
     + 'getoption scrolling:fullscreen_on_one_column" | tr -d "\\n"); '
-    + 'hyprctl clients -j | jq -c --argjson ws "$ws" --arg opts "$opts" '
-    + "'{ id: $ws.id, layout: $ws.tiledLayout, opts: $opts, columns: ("
-    + "[ .[] | select(.workspace.id == $ws.id and .floating == false and .mapped == true) | .at[0] ]"
-    + " | unique | length) }'"
+    + 'hyprctl clients -j | jq -c --argjson ws "$ws" --argjson mon "$mon" --arg opts "$opts" '
+    + "'[ .[] | select(.workspace.id == $ws.id and .floating == false and .mapped == true) ] as $w |"
+    + " ($w | sort_by(.at[0])) as $s |"
+    + " { id: $ws.id, layout: $ws.tiledLayout, opts: $opts,"
+    + " columns: ([ $w[] | .at[0] ] | unique | length),"
+    + " left: (if ($s|length) > 0 then $s[0].at[0] else 0 end),"
+    + " right: (if ($s|length) > 0 then ($s[-1].at[0] + $s[-1].size[0]) else 0 end),"
+    + " width: (( $mon[] | select(.name == $ws.monitor) | (.width / .scale) ) // 0) }'"
 
   Process {
     id: layoutProbe
@@ -116,16 +121,11 @@ BarWidget {
     }
   }
 
-  // Adding or removing a column shifts the tape without resizing anything, so
-  // the widths stay right while the whole row sits offset -- a gap at the
-  // leading edge and the last column hanging off the far side. Only re-anchor
-  // when the count matches the target: then every column fits, and "fit all"
-  // recomputes exactly the widths already set, making it a pure snap. Above
-  // the target the tape is legitimately scrolled and must be left alone;
-  // below it, "fit all" would stretch the columns to fill the screen.
-  function anchorIfSettled(previousCount) {
-    if (!root.scrolling || previousCount === root.columnCount) return
-    if (root.columnCount !== root.columns) return
+  // A row where every column fits has no business hanging off either edge.
+  // Rather than enumerate the things that scroll it -- a colresize, a window
+  // opening, leaving fullscreen -- detect the state itself and snap it back.
+  function anchorIfAdrift(parsed) {
+    if (!Model.needsAnchor(parsed, root.columns)) return
     root.run("hyprctl dispatch "
       + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1")
   }
@@ -144,7 +144,8 @@ BarWidget {
     openwindow: true,       // adds a column
     closewindow: true,      // removes one
     movewindow: true,       // moves one between workspaces
-    movewindowv2: true
+    movewindowv2: true,
+    fullscreen: true        // leaving fullscreen rebuilds the row and can scroll it
   })
 
   // Hyprland emits configreloaded the instant a layout toggle or a reload
@@ -220,7 +221,6 @@ BarWidget {
     // column origins), so a three-column workspace saw 3 === 3, ran "fit all"
     // against four real columns, and squeezed them all onto the screen.
     var wasScrolling = root.scrolling
-    var previousCount = root.columnCount
     root.columnCount = parsed.columns
     root.tiledLayout = parsed.layout
 
@@ -252,7 +252,7 @@ BarWidget {
 
     root.syncPeek()
     root.correctDrift(parsed.opts)
-    root.anchorIfSettled(previousCount)
+    root.anchorIfAdrift(parsed)
   }
 
   // Hyprland is the live source of truth, and anything set through eval is

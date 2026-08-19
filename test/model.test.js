@@ -86,16 +86,16 @@ test("workspace map updates do not mutate the original", () => {
 test("parseProbe reads layout and count together, or nothing", () => {
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"scrolling","columns":4}'),
-    { layout: "scrolling", columns: 4, opts: "" })
+    { layout: "scrolling", columns: 4, opts: "", left: 0, right: 0, width: 0 })
   // Dwindle reports a different count for the same windows; both fields have
   // to come from one sample or the transition logic misreads the workspace.
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"dwindle","columns":3}'),
-    { layout: "dwindle", columns: 3, opts: "" })
+    { layout: "dwindle", columns: 3, opts: "", left: 0, right: 0, width: 0 })
   assert.strictEqual(M.parseProbe("not json"), null)
   assert.strictEqual(M.parseProbe(""), null)
   assert.strictEqual(M.parseProbe(null), null)
-  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "" })
+  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "", left: 0, right: 0, width: 0 })
 })
 
 test("parseProbe carries the options text through to the drift check", () => {
@@ -154,4 +154,27 @@ test("optionsMatch compares at the precision actually written", () => {
   assert.strictEqual(M.optionsMatch(live, "0.333", true), false, "fullscreen drift counts too")
   assert.strictEqual(M.optionsMatch(null, "0.333", false), false)
   assert.strictEqual(M.optionsMatch({ columnWidth: null, fullscreenOnOneColumn: false }, "0.333", false), false)
+})
+
+test("needsAnchor spots a row that fits but hangs off an edge", () => {
+  const fits = { layout: "scrolling", columns: 3, left: 12, right: 2996, width: 3008 }
+  assert.strictEqual(M.needsAnchor(fits, 3), false, "flush row needs nothing")
+
+  // Leaving fullscreen scrolled the row left: three columns, first off-screen.
+  assert.strictEqual(
+    M.needsAnchor({ ...fits, left: -984, right: 2000 }, 3), true)
+  // A colresize shifted it right: last column past the far edge.
+  assert.strictEqual(
+    M.needsAnchor({ ...fits, left: 386, right: 3370 }, 3), true)
+
+  // More columns than the target: the tape is legitimately scrolled.
+  assert.strictEqual(
+    M.needsAnchor({ ...fits, columns: 5, left: -984, right: 2000 }, 3), false)
+  // Fewer than the target: a fit would stretch the columns, not move them.
+  assert.strictEqual(
+    M.needsAnchor({ ...fits, columns: 2, left: -984, right: 2000 }, 3), false)
+
+  assert.strictEqual(M.needsAnchor({ ...fits, layout: "dwindle", left: -984 }, 3), false)
+  assert.strictEqual(M.needsAnchor({ ...fits, width: 0, left: -984 }, 3), false, "no monitor width, no judgement")
+  assert.strictEqual(M.needsAnchor(null, 3), false)
 })
