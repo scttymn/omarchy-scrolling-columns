@@ -61,6 +61,12 @@ BarWidget {
   // somewhere to scroll, so the slack is applied only while the tape
   // overflows. At or under the target count the columns run flush.
   property int columnCount: 0
+
+  // A fullscreen window is not a column and its geometry is not the row's.
+  // Reshaping the layout underneath it drags it back into a column, so every
+  // layout-affecting path stands down until it is dismissed -- the
+  // fullscreen>>0 event brings the correction along right behind it.
+  property bool hasFullscreen: false
   readonly property bool overflowing: root.columnCount > root.columns
 
   // Nothing may act on the compositor until the store has been read. The
@@ -106,6 +112,7 @@ BarWidget {
     + "'[ .[] | select(.workspace.id == $ws.id and .floating == false and .mapped == true) ] as $w |"
     + " ($w | sort_by(.at[0])) as $s |"
     + " { id: $ws.id, layout: $ws.tiledLayout, opts: $opts,"
+    + " fullscreen: ($ws.hasfullscreen == true),"
     + " columns: ([ $w[] | .at[0] ] | unique | length),"
     + " left: (if ($s|length) > 0 then $s[0].at[0] else 0 end),"
     + " right: (if ($s|length) > 0 then ($s[-1].at[0] + $s[-1].size[0]) else 0 end),"
@@ -179,7 +186,7 @@ BarWidget {
   // workspace ended up tiled -- setting the config is inert there, and
   // colresize fails harmlessly with "Unknown dwindle layoutmsg".
   function reassertNow() {
-    if (!root.bar || !root.ready || root.workspaceId < 0) return
+    if (!root.bar || !root.ready || root.workspaceId < 0 || root.hasFullscreen) return
     var w = root.widthText(root.columns)
     var cmd = "hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
       + "; hyprctl dispatch "
@@ -223,6 +230,7 @@ BarWidget {
     var wasScrolling = root.scrolling
     root.columnCount = parsed.columns
     root.tiledLayout = parsed.layout
+    root.hasFullscreen = parsed.fullscreen
 
     // Track the layout before the store arrives, but touch nothing.
     if (!root.ready) return
@@ -364,7 +372,7 @@ BarWidget {
   // focused, so an empty workspace records intent and lets the default above
   // catch the first window that opens there.
   function resizeExistingColumns(n) {
-    if (!root.bar || !root.scrolling) return
+    if (!root.bar || !root.scrolling || root.hasFullscreen) return
     var lua = "hl.dsp.layout(\"colresize all " + root.widthText(n) + "\")"
     var cmd = "hyprctl dispatch " + Util.shellQuote(lua) + " >/dev/null 2>&1"
 

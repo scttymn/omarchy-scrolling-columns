@@ -86,16 +86,16 @@ test("workspace map updates do not mutate the original", () => {
 test("parseProbe reads layout and count together, or nothing", () => {
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"scrolling","columns":4}'),
-    { layout: "scrolling", columns: 4, opts: "", left: 0, right: 0, width: 0 })
+    { layout: "scrolling", columns: 4, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
   // Dwindle reports a different count for the same windows; both fields have
   // to come from one sample or the transition logic misreads the workspace.
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"dwindle","columns":3}'),
-    { layout: "dwindle", columns: 3, opts: "", left: 0, right: 0, width: 0 })
+    { layout: "dwindle", columns: 3, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
   assert.strictEqual(M.parseProbe("not json"), null)
   assert.strictEqual(M.parseProbe(""), null)
   assert.strictEqual(M.parseProbe(null), null)
-  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "", left: 0, right: 0, width: 0 })
+  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
 })
 
 test("parseProbe carries the options text through to the drift check", () => {
@@ -177,4 +177,12 @@ test("needsAnchor spots a row that fits but hangs off an edge", () => {
   assert.strictEqual(M.needsAnchor({ ...fits, layout: "dwindle", left: -984 }, 3), false)
   assert.strictEqual(M.needsAnchor({ ...fits, width: 0, left: -984 }, 3), false, "no monitor width, no judgement")
   assert.strictEqual(M.needsAnchor(null, 3), false)
+})
+
+test("needsAnchor stands down while a window is fullscreen", () => {
+  // A fullscreen window spans the monitor, so the row's extents describe
+  // something that is not the row. Fitting drags it back into a column.
+  const adrift = { layout: "scrolling", columns: 3, left: -984, right: 2000, width: 3008 }
+  assert.strictEqual(M.needsAnchor(adrift, 3), true)
+  assert.strictEqual(M.needsAnchor({ ...adrift, fullscreen: true }, 3), false)
 })

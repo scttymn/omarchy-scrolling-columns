@@ -100,6 +100,10 @@ function optionsMatch(live, wantedWidthText, wantedFullscreen) {
 // scrolled; below it, a fit would stretch the columns instead of moving them.
 function needsAnchor(probe, targetColumns) {
   if (!probe || probe.layout !== "scrolling") return false
+  // A fullscreen window spans the monitor and is not part of the row, so the
+  // extents describe something else entirely. Fitting here would drag it back
+  // into a column.
+  if (probe.fullscreen) return false
   if (probe.columns !== targetColumns) return false
   if (!(probe.width > 0)) return false
   return probe.left < 0 || probe.right > probe.width
@@ -168,6 +172,7 @@ function parseProbe(text) {
   return {
     layout: String(parsed.layout || ""),
     columns: Number(parsed.columns) || 0,
+    fullscreen: parsed.fullscreen === true,
     left: Number(parsed.left) || 0,
     right: Number(parsed.right) || 0,
     width: Number(parsed.width) || 0,
