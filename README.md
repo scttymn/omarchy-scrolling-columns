@@ -54,6 +54,8 @@ with no count, since a column count means nothing there.
 | Middle click | Toggle the workspace between scrolling and dwindle |
 
 The count cycles between `minColumns` and `maxColumns` and wraps at both ends.
+On a tiled (dwindle) workspace there is no count to change, so left click,
+right click and the wheel do nothing — only middle click is live there.
 
 Setting a workspace to the default count *unpins* it rather than storing an
 identical override, so it keeps following `defaultColumns` if you change that

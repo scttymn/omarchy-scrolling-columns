@@ -282,6 +282,11 @@ BarWidget {
   }
 
   function cycleColumns(step) {
+    // A dwindle workspace has no columns to count, and the widget shows no
+    // number there, so a click or scroll would rewrite the stored count and
+    // push a new column_width with nothing on screen to show for it. Middle
+    // click still switches the layout; that is the useful gesture here.
+    if (!root.scrolling) return
     setColumns(Model.cycleNext(root.columns, step, root.minColumns, root.maxColumns))
   }
 
