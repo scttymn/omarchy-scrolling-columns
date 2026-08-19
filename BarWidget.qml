@@ -61,16 +61,6 @@ BarWidget {
   // actually flips.
   property int appliedPeekState: -1
 
-  property bool wasScrolling: false
-  onScrollingChanged: {
-    if (root.scrolling && !root.wasScrolling && root.workspaceId >= 0) {
-      root.appliedPeekState = -1
-      root.setDefaultWidth(root.columns)
-      root.resizeExistingColumns(root.columns)
-    }
-    root.wasScrolling = root.scrolling
-  }
-
   function syncPeek() {
     if (!root.scrolling) return
     var wanted = root.overflowing ? 1 : 0
@@ -108,8 +98,25 @@ BarWidget {
     var parsed = null
     try { parsed = JSON.parse(String(output || "")) } catch (e) { return }
     if (!parsed) return
-    root.tiledLayout = String(parsed.layout || "")
+    // Layout and column count come from one sample and must both land before
+    // anything reacts to either. Assigning the layout first let the scrolling
+    // transition run against a stale count -- and dwindle reports a different
+    // count for the same windows (four windows tile into three distinct
+    // column origins), so a three-column workspace saw 3 === 3, ran "fit all"
+    // against four real columns, and squeezed them all onto the screen.
+    var wasScrolling = root.scrolling
     root.columnCount = Number(parsed.columns) || 0
+    root.tiledLayout = String(parsed.layout || "")
+
+    // A workspace becoming scrolling has to re-assert width and anchor:
+    // syncPeek only fires on a peek transition, which never happens with edge
+    // peek off, so the toggle would otherwise inherit whatever dwindle left.
+    if (root.scrolling && !wasScrolling && root.workspaceId >= 0) {
+      root.appliedPeekState = -1
+      root.setDefaultWidth(root.columns)
+      root.resizeExistingColumns(root.columns)
+    }
+
     root.syncPeek()
   }
 
