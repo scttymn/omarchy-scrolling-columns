@@ -125,7 +125,9 @@ BarWidget {
     + " columns: ([ $w[] | .at[0] ] | unique | length),"
     + " left: (if ($s|length) > 0 then $s[0].at[0] else 0 end),"
     + " right: (if ($s|length) > 0 then ($s[-1].at[0] + $s[-1].size[0]) else 0 end),"
-    + " width: (( $mon[] | select(.name == $ws.monitor) | (.width / .scale) ) // 0) }'"
+    + " width: (( $mon[] | select(.name == $ws.monitor) | (.width / .scale) ) // 0),"
+    + " xs: ([ $w[] | select(.fullscreen == 0) | .at[0] ] | unique),"
+    + " fsx: ([ $w[] | select(.fullscreen != 0) | .at[0] ] | first) }'"
 
   Process {
     id: layoutProbe
@@ -140,12 +142,16 @@ BarWidget {
   // A row where every column fits has no business hanging off either edge.
   // Rather than enumerate the things that scroll it -- a colresize, a window
   // opening, leaving fullscreen -- detect the state itself and snap it back.
-  function rememberRowLeft(parsed, wasFullscreen) {
-    if (parsed.fullscreen || parsed.layout !== "scrolling" || parsed.columns < 1) return
-    // Do not overwrite the remembered offset with the position Hyprland just
-    // scrolled to -- that is the one being corrected.
-    if (wasFullscreen) return
-    root.rowLeftBeforeFullscreen = parsed.left
+  // Recover the pre-fullscreen offset from the fullscreen state itself. An
+  // earlier version recorded the offset from ordinary probes instead, which
+  // could not work: panning emits no event, so the last recorded value was
+  // routinely minutes stale, and reading at the moment fullscreen begins loses
+  // a ~14ms race against Hyprland repositioning the row.
+  function rememberRowLeft(parsed) {
+    if (!parsed.fullscreen || parsed.layout !== "scrolling") return
+    var recovered = Model.recoverPreFullscreenLeft(parsed.xs, parsed.fullscreenX)
+    if (recovered === null) return
+    root.rowLeftBeforeFullscreen = recovered
     root.rowLeftRemembered = true
   }
 
@@ -290,8 +296,10 @@ BarWidget {
 
     root.syncPeek()
     root.correctDrift(parsed.opts)
+    root.rememberRowLeft(parsed)
     root.anchorIfAdrift(parsed, wasFullscreen)
-    root.rememberRowLeft(parsed, wasFullscreen)
+    // Spent on the way out; a later fullscreen recovers its own.
+    if (wasFullscreen && !parsed.fullscreen) root.rowLeftRemembered = false
   }
 
   // Hyprland is the live source of truth, and anything set through eval is

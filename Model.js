@@ -115,6 +115,41 @@ function optionsMatch(live, wantedWidthText, wantedFullscreen) {
 //
 // Valid positions run from flush-left (left == margin) to flush-right
 // (right == width - margin). A row that fits has only one: flush left.
+// Where the row sat before a window went fullscreen, recovered from the state
+// during fullscreen.
+//
+// The scrolling layout does not lift a window out: it resizes that column to
+// the full monitor width and scrolls the tape so the column sits at the
+// leading edge. The other columns keep their order and spacing and simply
+// slide, so the original offset is still encoded in them -- the leftmost
+// survivor, plus one column pitch for each column that precedes the
+// fullscreen one.
+//
+// This is why it can be computed at all: it needs no reading from before
+// fullscreen, which is unobtainable (panning emits no event, and Hyprland
+// repositions within ~14ms of announcing the change).
+function recoverPreFullscreenLeft(xs, fullscreenX) {
+  if (!xs || xs.length < 2) return null
+  if (fullscreenX === null || fullscreenX === undefined) return null
+
+  var sorted = xs.slice().sort(function (a, b) { return a - b })
+  var pitch = sorted[1] - sorted[0]
+  if (!(pitch > 0)) return null
+
+  var precedingColumns = 0
+  for (var i = 0; i < sorted.length; i++) {
+    if (sorted[i] < fullscreenX) precedingColumns++
+  }
+
+  // With nothing to its left, the shift that put the fullscreen column at the
+  // leading edge was exactly the row's own offset, so the survivors encode
+  // nothing about it. No matter: a column that led before leads again after,
+  // which is already the view the user had.
+  if (precedingColumns === 0) return null
+
+  return Math.round(sorted[0] + precedingColumns * pitch)
+}
+
 // preferredLeft, when given, is where the row would like to sit -- the offset
 // it had before something moved it. It is clamped like any other position, so
 // a stale preference cannot scroll the row somewhere invalid.
@@ -225,6 +260,8 @@ function parseProbe(text) {
     layout: String(parsed.layout || ""),
     columns: Number(parsed.columns) || 0,
     fullscreen: parsed.fullscreen === true,
+    xs: Array.isArray(parsed.xs) ? parsed.xs.map(Number) : [],
+    fullscreenX: (parsed.fsx === null || parsed.fsx === undefined) ? null : Number(parsed.fsx),
     left: Number(parsed.left) || 0,
     right: Number(parsed.right) || 0,
     width: Number(parsed.width) || 0,
@@ -250,6 +287,7 @@ if (typeof module !== "undefined") {
     parseOptions: parseOptions,
     isPinned: isPinned,
     parseProbe: parseProbe,
+    recoverPreFullscreenLeft: recoverPreFullscreenLeft,
     storedColumns: storedColumns,
     withWorkspace: withWorkspace,
     withoutWorkspace: withoutWorkspace

@@ -86,16 +86,16 @@ test("workspace map updates do not mutate the original", () => {
 test("parseProbe reads layout and count together, or nothing", () => {
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"scrolling","columns":4}'),
-    { layout: "scrolling", columns: 4, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
+    { layout: "scrolling", columns: 4, opts: "", fullscreen: false, xs: [], fullscreenX: null, left: 0, right: 0, width: 0 })
   // Dwindle reports a different count for the same windows; both fields have
   // to come from one sample or the transition logic misreads the workspace.
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"dwindle","columns":3}'),
-    { layout: "dwindle", columns: 3, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
+    { layout: "dwindle", columns: 3, opts: "", fullscreen: false, xs: [], fullscreenX: null, left: 0, right: 0, width: 0 })
   assert.strictEqual(M.parseProbe("not json"), null)
   assert.strictEqual(M.parseProbe(""), null)
   assert.strictEqual(M.parseProbe(null), null)
-  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "", fullscreen: false, left: 0, right: 0, width: 0 })
+  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "", fullscreen: false, xs: [], fullscreenX: null, left: 0, right: 0, width: 0 })
 })
 
 test("parseProbe carries the options text through to the drift check", () => {
@@ -225,4 +225,22 @@ test("anchorDelta aims for a remembered position, still clamped", () => {
   // No preference given behaves exactly as before.
   assert.strictEqual(M.anchorDelta(row(-1990, 2000), m), 996)
   assert.strictEqual(M.anchorDelta(row(-1990, 2000), m, null), 996)
+})
+
+test("recoverPreFullscreenLeft reads the offset out of the surviving columns", () => {
+  // Captured from a real cycle: row was at 12, chromium (3rd of 4) went
+  // fullscreen, and the survivors slid to these positions.
+  assert.strictEqual(M.recoverPreFullscreenLeft([-1988, -988, 3015], 0), 12)
+  // Order of the input must not matter.
+  assert.strictEqual(M.recoverPreFullscreenLeft([3015, -988, -1988], 0), 12)
+
+  // The fullscreen column was already leading: the shift that put it at the
+  // edge was the row's whole offset, so nothing survives to recover it -- and
+  // nothing needs to, since it leads again on the way out.
+  assert.strictEqual(M.recoverPreFullscreenLeft([1000, 2000], 0), null)
+
+  assert.strictEqual(M.recoverPreFullscreenLeft([100], 0), null, "one column tells us no pitch")
+  assert.strictEqual(M.recoverPreFullscreenLeft([1, 2], null), null, "nothing is fullscreen")
+  assert.strictEqual(M.recoverPreFullscreenLeft([5, 5], 0), null, "zero pitch is unusable")
+  assert.strictEqual(M.recoverPreFullscreenLeft(null, 0), null)
 })
