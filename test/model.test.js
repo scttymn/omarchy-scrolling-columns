@@ -86,16 +86,32 @@ test("workspace map updates do not mutate the original", () => {
 test("parseProbe reads layout and count together, or nothing", () => {
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"scrolling","columns":4}'),
-    { layout: "scrolling", columns: 4 })
+    { layout: "scrolling", columns: 4, opts: "" })
   // Dwindle reports a different count for the same windows; both fields have
   // to come from one sample or the transition logic misreads the workspace.
   assert.deepStrictEqual(
     M.parseProbe('{"layout":"dwindle","columns":3}'),
-    { layout: "dwindle", columns: 3 })
+    { layout: "dwindle", columns: 3, opts: "" })
   assert.strictEqual(M.parseProbe("not json"), null)
   assert.strictEqual(M.parseProbe(""), null)
   assert.strictEqual(M.parseProbe(null), null)
-  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0 })
+  assert.deepStrictEqual(M.parseProbe("{}"), { layout: "", columns: 0, opts: "" })
+})
+
+test("parseProbe carries the options text through to the drift check", () => {
+  // Regression: opts was dropped from the return, so correctDrift received
+  // undefined and silently bailed on every probe -- the reload correction
+  // never ran, and only a workspace change happened to fix the width.
+  const raw = JSON.stringify({
+    layout: "scrolling", columns: 3,
+    opts: '{"option": "scrolling:column_width", "float": 0.49, "set": true }'
+  })
+  const probe = M.parseProbe(raw)
+  assert.strictEqual(probe.columns, 3)
+  assert.ok(probe.opts.length > 0, "opts must survive parseProbe")
+  const live = M.parseOptions(probe.opts)
+  assert.strictEqual(live.columnWidth, 0.49)
+  assert.strictEqual(M.optionsMatch(live, "0.333", false), false, "0.49 after a reload is drift")
 })
 
 test("isPeeking needs slack, not merely an overflowing tape", () => {

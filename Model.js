@@ -156,7 +156,10 @@ function parseProbe(text) {
   if (!parsed || typeof parsed !== "object") return null
   return {
     layout: String(parsed.layout || ""),
-    columns: Number(parsed.columns) || 0
+    columns: Number(parsed.columns) || 0,
+    // What Hyprland actually has, for the drift check. Raw text: parsed by
+    // parseOptions, which handles hyprctl --batch's concatenated objects.
+    opts: String(parsed.opts || "")
   }
 }
 
