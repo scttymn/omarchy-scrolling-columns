@@ -233,9 +233,18 @@ BarWidget {
     var persisted = "-- Written by scttymn.scrolling-columns; edit the widget, not this file.\n"
       + root.scrollingConfig(Model.columnWidthText(n, 1.0, false)) + "\n"
 
+    // Written through a temp file and renamed, because a bar surface exists
+    // per monitor: every instance watches the same focused workspace, so a
+    // workspace switch fires this once per display at the same moment. A
+    // plain > truncates before it writes, and this file is sourced into the
+    // user's Hyprland config, so a torn write there breaks every toggle on
+    // the system. rename(2) is atomic, making concurrent writers last-wins
+    // over an always-complete file. $$ keeps the temp names distinct.
+    var quoted = Util.shellQuote(path)
     root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
       + " >/dev/null 2>&1; mkdir -p " + Util.shellQuote(dir)
-      + " && printf '%s' " + Util.shellQuote(persisted) + " > " + Util.shellQuote(path))
+      + " && printf '%s' " + Util.shellQuote(persisted) + " > " + quoted + ".tmp.$$"
+      + " && mv -f " + quoted + ".tmp.$$ " + quoted)
   }
 
   // colresize reaches only the focused window's tape, which is exactly the

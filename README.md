@@ -138,6 +138,19 @@ this one touches:
 - It shells out to `hyprctl eval` and `hyprctl dispatch` to apply widths, and to
   `omarchy-hyprland-workspace-layout-toggle` on middle click.
 
+## Multiple monitors
+
+A bar surface exists per monitor, so each display gets its own instance of the
+widget. They all watch the same focused workspace and issue the same commands
+with the same values, which is redundant but not incorrect — `hyprctl` calls
+here are idempotent, the reload file is written atomically, and only the
+instance you actually click writes the per-workspace state.
+
+Expect one extra `hyprctl` poll every `probeIntervalMs` per additional
+display. This has been reasoned through rather than tested on real hardware;
+if you run multiple monitors and see the widgets disagree, please open an
+issue.
+
 ## Development
 
 Column arithmetic lives in `Model.js`, kept Qt-free so it can be tested without
