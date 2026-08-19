@@ -18,14 +18,24 @@ BarWidget {
   id: root
   moduleName: "scttymn.scrolling-columns"
 
-  readonly property int fallbackColumns: Math.max(1, Number(root.setting("defaultColumns", 2)))
-  readonly property int maxColumns: Math.max(2, Number(root.setting("maxColumns", 6)))
+  // One column is what fullscreen_on_one_column already gives you, so the
+  // floor is two: below that the widget is just a worse way to fullscreen.
+  readonly property int minColumns: Math.max(1, Number(root.setting("minColumns", 2)))
+  readonly property int maxColumns: Math.max(root.minColumns + 1, Number(root.setting("maxColumns", 6)))
+  readonly property int fallbackColumns: root.clampColumns(Number(root.setting("defaultColumns", 2)))
   readonly property int probeIntervalMs: Math.max(500, Number(root.setting("probeIntervalMs", 2000)))
   readonly property bool hideOnDwindle: root.setting("hideOnDwindle", false) === true
 
-  // Omarchy ships 0.49 rather than 0.50 for two columns; that missing 2% is
-  // what keeps gaps_out from pushing the last column off the edge of the tape.
-  readonly property real usableWidth: Number(root.setting("usableWidth", 0.98))
+  // Columns span the full screen by default. Hyprland subtracts gaps and
+  // borders from each column's own allotment, so 1/N already fits edge to
+  // edge at any gap setting. See the README on why edge peek is off.
+  readonly property real usableWidth: Number(root.setting("usableWidth", 1.0))
+
+  function clampColumns(n) {
+    var v = Math.round(Number(n))
+    if (!(v >= 1)) v = root.minColumns
+    return Math.max(root.minColumns, Math.min(root.maxColumns, v))
+  }
 
   readonly property string home: Quickshell.env("HOME") || ""
   readonly property string stateHome: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/omarchy"
@@ -138,7 +148,7 @@ BarWidget {
     var value = map ? map[String(id)] : undefined
     var n = Number(value)
     if (!(n >= 1)) return root.fallbackColumns
-    return Math.min(Math.round(n), root.maxColumns)
+    return root.clampColumns(n)
   }
 
   readonly property int columns: storedColumns(workspaceId)
@@ -225,7 +235,7 @@ BarWidget {
   }
 
   function setColumns(n) {
-    var clamped = Math.max(1, Math.min(root.maxColumns, Math.round(n)))
+    var clamped = root.clampColumns(n)
     if (clamped === root.fallbackColumns) root.forgetColumns(root.workspaceId)
     else root.rememberColumns(root.workspaceId, clamped)
     // Changing the target can itself cross the threshold, so the width used
@@ -238,10 +248,9 @@ BarWidget {
   }
 
   function cycleColumns(step) {
-    var span = root.maxColumns
     var next = root.columns + step
-    if (next > span) next = 1
-    if (next < 1) next = span
+    if (next > root.maxColumns) next = root.minColumns
+    if (next < root.minColumns) next = root.maxColumns
     setColumns(next)
   }
 

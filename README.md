@@ -32,6 +32,8 @@ with `SUPER + L`. The widget dims on tiled (dwindle) workspaces.
 | Right click / wheel down | −1 column (wraps) |
 | Middle click | Toggle the workspace between scrolling and dwindle |
 
+The count cycles between `minColumns` and `maxColumns` and wraps at both ends.
+
 Setting a workspace to the default count *unpins* it rather than storing an
 identical override, so it keeps following `defaultColumns` if you change that
 later. The tooltip shows which state you are in.
@@ -46,8 +48,9 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `defaultColumns` | `2` | Column count for workspaces with no explicit setting |
-| `maxColumns` | `6` | Upper bound for the click/wheel cycle |
+| `defaultColumns` | `2` | Column count for workspaces with no explicit setting. Matches stock Omarchy, which ships `column_width = 0.49` — two columns |
+| `minColumns` | `2` | Lower bound for the cycle. One column is what `fullscreen_on_one_column` already does, so two is the floor |
+| `maxColumns` | `6` | Upper bound for the cycle |
 | `usableWidth` | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
 | `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
 | `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of dimming it |
