@@ -312,7 +312,12 @@ BarWidget {
 
   // ------------------------------------------------------------------- ui
 
-  readonly property string glyph: ""
+  // The layout is what the icon reports: a split-pane glyph with the column
+  // count while scrolling, a tiled-grid glyph on dwindle. A count would be
+  // meaningless on dwindle, so it is dropped rather than shown greyed out.
+  readonly property string scrollingGlyph: ""
+  readonly property string dwindleGlyph: ""
+  readonly property string glyph: root.scrolling ? root.scrollingGlyph : root.dwindleGlyph
 
   visible: !root.hideOnDwindle || root.scrolling
   implicitWidth: button.implicitWidth
@@ -331,11 +336,10 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.glyph + " " + root.columns
-    dimmed: !root.scrolling
+    text: root.scrolling ? (root.glyph + " " + root.columns) : root.glyph
     tooltipText: {
       if (!root.scrolling)
-        return "Workspace " + root.workspaceId + " is tiled (SUPER + L for scrolling)"
+        return "Workspace " + root.workspaceId + " is tiled · middle click or SUPER + L for scrolling"
       var count = root.columns === 1 ? "1 column" : root.columns + " columns"
       return count + " on workspace " + root.workspaceId
         + (root.pinned ? "" : " (default)")
