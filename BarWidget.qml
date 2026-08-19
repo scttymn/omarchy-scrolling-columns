@@ -315,11 +315,12 @@ BarWidget {
   // The layout is what the icon reports: columns plus the count while
   // scrolling, an uneven masonry block on dwindle -- which is what nested
   // dwindle splits actually look like, where a uniform grid is not. Both
-  // glyphs come from the same Material set on purpose: mixing a framed
-  // glyph with an unframed one leaves them visibly different weights at
-  // the bar's 13px. A count is dropped on dwindle rather than greyed out,
+  // The columns glyph is the Font Awesome one rather than the Material
+  // set's, which measures 10x7 at the bar's 13px and reads as squashed
+  // beside neighbours that are all about 11 tall. These two are 12x11
+  // and 10x11. A count is dropped on dwindle rather than greyed out,
   // since a column count means nothing there.
-  readonly property string scrollingGlyph: "󰕭"
+  readonly property string scrollingGlyph: ""
   readonly property string dwindleGlyph: "󰕮"
   readonly property string glyph: root.scrolling ? root.scrollingGlyph : root.dwindleGlyph
 
