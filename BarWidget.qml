@@ -312,11 +312,15 @@ BarWidget {
 
   // ------------------------------------------------------------------- ui
 
-  // The layout is what the icon reports: a split-pane glyph with the column
-  // count while scrolling, a tiled-grid glyph on dwindle. A count would be
-  // meaningless on dwindle, so it is dropped rather than shown greyed out.
-  readonly property string scrollingGlyph: ""
-  readonly property string dwindleGlyph: ""
+  // The layout is what the icon reports: columns plus the count while
+  // scrolling, an uneven masonry block on dwindle -- which is what nested
+  // dwindle splits actually look like, where a uniform grid is not. Both
+  // glyphs come from the same Material set on purpose: mixing a framed
+  // glyph with an unframed one leaves them visibly different weights at
+  // the bar's 13px. A count is dropped on dwindle rather than greyed out,
+  // since a column count means nothing there.
+  readonly property string scrollingGlyph: "󰕭"
+  readonly property string dwindleGlyph: "󰕮"
   readonly property string glyph: root.scrolling ? root.scrollingGlyph : root.dwindleGlyph
 
   visible: !root.hideOnDwindle || root.scrolling
