@@ -117,6 +117,19 @@ BarWidget {
     }
   }
 
+  // Hyprland emits configreloaded the instant a layout toggle or a reload
+  // re-evaluates the config -- which is exactly when the width set through
+  // eval is discarded. Reacting to it beats waiting up to a probe interval,
+  // and it covers SUPER + L, which the widget has no other way to observe.
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (String(event.name) !== "configreloaded") return
+      root.probe()
+      probeSoon.restart()
+    }
+  }
+
   function probe() {
     if (!layoutProbe.running) layoutProbe.running = true
   }
@@ -387,7 +400,7 @@ BarWidget {
   // before re-reading rather than showing a stale dimmed state for a full poll.
   Timer {
     id: probeSoon
-    interval: 400
+    interval: 150
     repeat: false
     onTriggered: root.probe()
   }
