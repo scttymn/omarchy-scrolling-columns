@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "scttymn.scrolling-columns",
+  "name": "Scrolling Columns",
+  "version": "1.0.0",
+  "author": "scttymn",
+  "license": "MIT",
+  "description": "Set how many columns fill the screen in Hyprland's scrolling layout, tracked per workspace.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Scrolling Columns",
+    "description": "Click or scroll to choose how many columns fill the screen on the active scrolling workspace.",
+    "category": "Compositor",
+    "aliases": [
+      "columns",
+      "scrolling-columns"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "defaultColumns": 2,
+      "maxColumns": 6,
+      "usableWidth": 0.98,
+      "probeIntervalMs": 2000,
+      "hideOnDwindle": false
+    }
+  }
+}
