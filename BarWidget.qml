@@ -70,6 +70,7 @@ BarWidget {
   // a transition into scrolling, and resize every existing column to the
   // default -- silently discarding the count on every shell restart.
   property bool ready: false
+  property bool recovered: false
 
   Timer {
     // The store may legitimately not exist yet on a fresh install, in which
@@ -135,6 +136,20 @@ BarWidget {
 
     // Track the layout before the store arrives, but touch nothing.
     if (!root.ready) return
+
+    // First probe with the store in hand: this is the recovery step. The
+    // store holds the intent, Hyprland holds whatever survived, and they can
+    // legitimately disagree -- a reload resets the config, and a restart of
+    // the shell leaves columns at whatever width they had. Assert both once,
+    // then leave existing columns alone unless something actually changes.
+    if (!root.recovered) {
+      root.recovered = true
+      if (root.scrolling && root.workspaceId >= 0) {
+        root.setDefaultWidth(root.columns)
+        root.resizeExistingColumns(root.columns)
+      }
+      return
+    }
 
     // A workspace becoming scrolling has to re-assert width and anchor:
     // syncPeek only fires on a peek transition, which never happens with edge
