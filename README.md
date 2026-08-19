@@ -73,11 +73,28 @@ omarchy bar set scttymn.scrolling-columns defaultColumns 3
 | `maxColumns` | `6` | Upper bound for the cycle |
 | `usableWidth` † | `1.0` | Fraction of the screen the columns span. Below `1.0` leaves slack at the edges while the tape overflows — see *Edge peek* below |
 | `probeIntervalMs` | `2000` | Poll interval for layout and column-count changes |
-| `fullscreenOnOneColumn` | `true` | Hyprland's default: a lone window spans the whole screen regardless of column width. Turn off to make a single window respect the column width instead |
+| `fullscreenOnOneColumn` | `false` | Keeps a lone window at the column width. Set `true` for Hyprland's stock behaviour, where one window spans the whole screen — see below |
 | `hideOnDwindle` | `false` | Hide the widget entirely on tiled workspaces instead of dimming it |
 
 † `usableWidth` is config-file only — it is deliberately kept out of the
 settings form, for the reason below.
+
+### Restoring the fullscreen single window
+
+Hyprland's `scrolling:fullscreen_on_one_column` defaults to `true`, so a lone
+window spans the whole screen no matter what column width is set. This plugin
+ships the opposite, because a workspace set to three columns should keep them
+at a third whatever happens to be open — otherwise closing windows silently
+undoes the setting.
+
+To get Hyprland's behaviour back:
+
+```bash
+omarchy bar set scttymn.scrolling-columns fullscreenOnOneColumn true
+```
+
+The plugin applies this alongside `column_width`, so the two can never
+disagree, and it is written to the reload file so it survives `hyprctl reload`.
 
 ### Edge peek
 

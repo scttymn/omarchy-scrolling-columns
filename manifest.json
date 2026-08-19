@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "scttymn.scrolling-columns",
   "name": "Scrolling Columns",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "scttymn",
   "license": "MIT",
   "description": "Set how many columns fill the screen in Hyprland's scrolling layout, tracked per workspace.",
@@ -30,7 +30,7 @@
       "usableWidth": 1.0,
       "probeIntervalMs": 2000,
       "hideOnDwindle": false,
-      "fullscreenOnOneColumn": true
+      "fullscreenOnOneColumn": false
     },
     "schema": [
       {
@@ -84,8 +84,8 @@
         "key": "fullscreenOnOneColumn",
         "type": "boolean",
         "label": "Single window fills the screen",
-        "defaultValue": true,
-        "description": "Hyprland's default. Turn off to make a lone window respect the column width instead of spanning the screen."
+        "defaultValue": false,
+        "description": "Off by default, so a lone window keeps the column width. Turn on for Hyprland's stock behaviour, where one window spans the whole screen."
       }
     ]
   }

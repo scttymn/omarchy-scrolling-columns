@@ -31,9 +31,10 @@ BarWidget {
 
   // Hyprland's fullscreen_on_one_column defaults to true, so a lone window
   // spans the screen no matter what column count is set -- which reads as the
-  // widget being ignored. Exposed here because it is squarely the same
-  // concern, and applied alongside column_width so the two never disagree.
-  readonly property bool fullscreenOnOneColumn: root.setting("fullscreenOnOneColumn", true) === true
+  // widget being ignored. This ships the opposite default on purpose: a
+  // workspace set to N columns should keep them at 1/N whatever is open.
+  // Applied alongside column_width so the two never disagree.
+  readonly property bool fullscreenOnOneColumn: root.setting("fullscreenOnOneColumn", false) === true
 
   // Columns span the full screen by default. Hyprland subtracts gaps and
   // borders from each column's own allotment, so 1/N already fits edge to
