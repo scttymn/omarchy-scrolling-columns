@@ -117,6 +117,20 @@ BarWidget {
     }
   }
 
+  // Adding or removing a column shifts the tape without resizing anything, so
+  // the widths stay right while the whole row sits offset -- a gap at the
+  // leading edge and the last column hanging off the far side. Only re-anchor
+  // when the count matches the target: then every column fits, and "fit all"
+  // recomputes exactly the widths already set, making it a pure snap. Above
+  // the target the tape is legitimately scrolled and must be left alone;
+  // below it, "fit all" would stretch the columns to fill the screen.
+  function anchorIfSettled(previousCount) {
+    if (!root.scrolling || previousCount === root.columnCount) return
+    if (root.columnCount !== root.columns) return
+    root.run("hyprctl dispatch "
+      + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1")
+  }
+
   // Hyprland emits configreloaded the instant a layout toggle or a reload
   // re-evaluates the config -- which is exactly when the width set through
   // eval is discarded. Reacting to it beats waiting up to a probe interval,
@@ -173,6 +187,7 @@ BarWidget {
     // column origins), so a three-column workspace saw 3 === 3, ran "fit all"
     // against four real columns, and squeezed them all onto the screen.
     var wasScrolling = root.scrolling
+    var previousCount = root.columnCount
     root.columnCount = parsed.columns
     root.tiledLayout = parsed.layout
 
@@ -204,6 +219,7 @@ BarWidget {
 
     root.syncPeek()
     root.correctDrift(parsed.opts)
+    root.anchorIfSettled(previousCount)
   }
 
   // Hyprland is the live source of truth, and anything set through eval is
