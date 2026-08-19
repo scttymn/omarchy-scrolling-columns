@@ -180,9 +180,19 @@ BarWidget {
   function reassertNow() {
     if (!root.bar || !root.ready || root.workspaceId < 0) return
     var w = root.widthText(root.columns)
-    root.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
+    var cmd = "hyprctl eval " + Util.shellQuote(root.scrollingConfig(w)) + " >/dev/null 2>&1"
       + "; hyprctl dispatch "
-      + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1")
+      + Util.shellQuote("hl.dsp.layout(\"colresize all " + w + "\")") + " >/dev/null 2>&1"
+
+    // colresize recalculates the row and can shift the tape even when it does
+    // not change a single width, leaving a gap at the leading edge. Same gate
+    // as everywhere else: only when the count matches the target, where
+    // "fit all" reproduces the widths just set and only re-anchors.
+    if (root.columnCount === root.columns)
+      cmd += "; hyprctl dispatch "
+        + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1"
+
+    root.run(cmd)
   }
 
   // bar.run goes through Util.execDetached, which spawns a LOGIN shell:
