@@ -83,8 +83,10 @@ BarWidget {
   // derived from distinct column origins rather than from toplevel count.
   readonly property string probeScript:
     'ws=$(hyprctl activeworkspace -j) || exit 0; '
-    + 'hyprctl clients -j | jq -c --argjson ws "$ws" '
-    + "'{ id: $ws.id, layout: $ws.tiledLayout, columns: ("
+    + 'opts=$(hyprctl -j --batch "getoption scrolling:column_width ; '
+    + 'getoption scrolling:fullscreen_on_one_column" | tr -d "\\n"); '
+    + 'hyprctl clients -j | jq -c --argjson ws "$ws" --arg opts "$opts" '
+    + "'{ id: $ws.id, layout: $ws.tiledLayout, opts: $opts, columns: ("
     + "[ .[] | select(.workspace.id == $ws.id and .floating == false and .mapped == true) | .at[0] ]"
     + " | unique | length) }'"
 
@@ -125,6 +127,22 @@ BarWidget {
     }
 
     root.syncPeek()
+    root.correctDrift(parsed.opts)
+  }
+
+  // Hyprland is the live source of truth, and anything set through eval is
+  // discarded by `hyprctl reload` -- which Omarchy triggers for theme changes
+  // and toggles. Rather than keeping a copy in Hyprland's own config
+  // directory, the widget reads back what actually took and re-applies when
+  // it does not match. Existing columns are untouched by a reload (verified:
+  // they keep their own widths), so only the default for the next new column
+  // needs correcting.
+  function correctDrift(optsText) {
+    if (!root.scrolling || root.workspaceId < 0) return
+    var live = Model.parseOptions(optsText)
+    if (!live) return
+    if (Model.optionsMatch(live, root.widthText(root.columns), root.fullscreenOnOneColumn)) return
+    root.setDefaultWidth(root.columns)
   }
 
   // A toplevel opening or closing is the common way to cross the threshold,
@@ -212,61 +230,16 @@ BarWidget {
       + ", fullscreen_on_one_column = " + (root.fullscreenOnOneColumn ? "true" : "false") + " } })"
   }
 
-  // Applying the live config and writing the reload file are one command on
-  // purpose. As two, the file only tracked change events, so it drifted any
-  // time the effective value moved without one -- a settings default changing
-  // under it, or a fresh install where nobody ever touches a setting and no
-  // file is written at all, losing the column count on the next reload.
+  // One place to write: Hyprland itself. An earlier version also wrote a lua
+  // file into ~/.local/state/omarchy/toggles/hypr/, which Hyprland sources
+  // wholesale, purely so a reload would not lose the width. That bought a
+  // torn-write hazard across monitors, a filename that breaks every toggle on
+  // the system if it contains a dot, and a file left behind on uninstall --
+  // all to avoid a correction the probe now makes within one interval.
   function setDefaultWidth(n) {
     if (!root.bar) return
-    var dir = root.stateHome + "/toggles/hypr"
-    // Namespaced so two plugins cannot claim the same file in this shared,
-    // sourced-wholesale directory -- but with HYPHENS, never dots. require_all
-    // strips .lua and calls require() on the rest, so "a.b.lua" is read as the
-    // Lua module path a/b and fails to resolve, which aborts the whole
-    // default.hypr.toggles load and takes every other toggle down with it.
-    var path = dir + "/scttymn-scrolling-columns.lua"
-
-    // The reload baseline is always the flush width: peek is a transient
-    // response to an overflowing tape, and baking it into the boot default
-    // would apply slack before the widget has seen how many columns exist.
-    var persisted = "-- Written by scttymn.scrolling-columns; edit the widget, not this file.\n"
-      + root.scrollingConfig(Model.columnWidthText(n, 1.0, false)) + "\n"
-
-    // Written through a temp file and renamed, because a bar surface exists
-    // per monitor: every instance watches the same focused workspace, so a
-    // workspace switch fires this once per display at the same moment. A
-    // plain > truncates before it writes, and this file is sourced into the
-    // user's Hyprland config, so a torn write there breaks every toggle on
-    // the system. rename(2) is atomic, making concurrent writers last-wins
-    // over an always-complete file. $$ keeps the temp names distinct.
-    var quoted = Util.shellQuote(path)
     root.bar.run("hyprctl eval " + Util.shellQuote(root.scrollingConfig(root.widthText(n)))
-      + " >/dev/null 2>&1; mkdir -p " + Util.shellQuote(dir)
-      + " && printf '%s' " + Util.shellQuote(persisted) + " > " + quoted + ".tmp.$$"
-      + " && mv -f " + quoted + ".tmp.$$ " + quoted)
-  }
-
-  // colresize reaches only the focused window's tape, which is exactly the
-  // per-workspace behaviour we want. It early-returns when nothing is
-  // focused, so an empty workspace records intent and lets the default above
-  // catch the first window that opens there.
-  function resizeExistingColumns(n) {
-    if (!root.bar || !root.scrolling) return
-    var lua = "hl.dsp.layout(\"colresize all " + root.widthText(n) + "\")"
-    var cmd = "hyprctl dispatch " + Util.shellQuote(lua) + " >/dev/null 2>&1"
-
-    // Resizing columns does not move the viewport, so an offset left over from
-    // the previous widths survives and shows up as a gap at the leading edge
-    // with the last column cut off. Nothing re-anchors it on its own:
-    // fit_into_view is a no-op, move does not clamp at the start of the tape,
-    // and fit tobeg widens the columns. When the column count already equals
-    // the target, every column fits, so "fit all" recomputes exactly the
-    // widths we just set and re-anchors as a side effect -- a pure snap.
-    if (root.columnCount === n)
-      cmd += "; hyprctl dispatch " + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1"
-
-    root.bar.run(cmd)
+      + " >/dev/null 2>&1")
   }
 
   function setColumns(n) {

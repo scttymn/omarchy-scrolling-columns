@@ -116,3 +116,26 @@ test("bounds applies the hard ceiling that the QML properties rely on", () => {
   assert.strictEqual(b.max, M.HARD_MAX_COLUMNS)
   assert.strictEqual(M.clampColumns(500, 2, 500), M.HARD_MAX_COLUMNS)
 })
+
+test("parseOptions reads hyprctl --batch's concatenated objects", () => {
+  const batch = '{"option": "scrolling:column_width", "float": 0.333000, "set": true }'
+              + '{"option": "scrolling:fullscreen_on_one_column", "bool": false, "set": true }'
+  assert.deepStrictEqual(M.parseOptions(batch), { columnWidth: 0.333, fullscreenOnOneColumn: false })
+  // Order is not assumed; each object carries its own name.
+  const reversed = '{"option": "scrolling:fullscreen_on_one_column", "bool": true, "set": true }'
+                 + '{"option": "scrolling:column_width", "float": 0.5, "set": true }'
+  assert.deepStrictEqual(M.parseOptions(reversed), { columnWidth: 0.5, fullscreenOnOneColumn: true })
+  assert.strictEqual(M.parseOptions(""), null)
+  assert.strictEqual(M.parseOptions("not json"), null)
+  assert.strictEqual(M.parseOptions('{"option":"something:else","float":1}'), null)
+})
+
+test("optionsMatch compares at the precision actually written", () => {
+  // Hyprland reports full float precision; the widget writes three decimals.
+  const live = { columnWidth: 0.333, fullscreenOnOneColumn: false }
+  assert.strictEqual(M.optionsMatch(live, "0.333", false), true)
+  assert.strictEqual(M.optionsMatch(live, "0.500", false), false, "a reload reset must be detected")
+  assert.strictEqual(M.optionsMatch(live, "0.333", true), false, "fullscreen drift counts too")
+  assert.strictEqual(M.optionsMatch(null, "0.333", false), false)
+  assert.strictEqual(M.optionsMatch({ columnWidth: null, fullscreenOnOneColumn: false }, "0.333", false), false)
+})

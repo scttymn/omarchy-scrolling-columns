@@ -27,19 +27,16 @@ omarchy plugin add https://github.com/scttymn/omarchy-scrolling-columns.git --en
 omarchy plugin remove scttymn.scrolling-columns
 ```
 
-That removes the plugin and its bar entry. It does not touch the two files it
-wrote, so delete those too if you want it gone completely:
+That removes the plugin and its bar entry. It leaves behind the one file it
+wrote, so delete that too if you want it gone completely:
 
 ```bash
 rm -f ~/.local/state/omarchy/scttymn.scrolling-columns.json
-rm -f ~/.local/state/omarchy/toggles/hypr/scttymn-scrolling-columns.lua
 hyprctl reload
 ```
 
-The second file is the one that matters — it sets `scrolling:column_width`, so
-leaving it behind keeps your last column count applied after the widget is
-gone. Removing it and reloading returns Hyprland to Omarchy's default of two
-columns.
+The reload returns `scrolling:column_width` to Omarchy's default of two
+columns. Nothing is written into your Hyprland config.
 
 Requires the scrolling layout on the workspace you want to affect — toggle it
 with `SUPER + L`. On tiled (dwindle) workspaces the widget shows a grid icon
@@ -131,15 +128,17 @@ Plugins run unsandboxed inside the `omarchy-shell` process, so here is everythin
 this one touches:
 
 - `~/.local/state/omarchy/scttymn.scrolling-columns.json` — the per-workspace
-  column counts.
-- `~/.local/state/omarchy/toggles/hypr/scttymn-scrolling-columns.lua` — a
-  `column_width` default so `hyprctl reload` lands somewhere sensible before the
-  widget re-syncs. **This directory is sourced into your Hyprland config.** The
-  filename uses hyphens rather than dots deliberately: `require_all` strips
-  `.lua` and calls `require()` on the rest, so a dotted name is read as a Lua
-  module path, fails to resolve, and takes every other toggle down with it.
+  column counts. This is the only file it writes.
 - It shells out to `hyprctl eval` and `hyprctl dispatch` to apply widths, and to
   `omarchy-hyprland-workspace-layout-toggle` on middle click.
+
+Nothing is written into your Hyprland config directory. Hyprland holds the
+live state and the JSON is write-behind persistence: it is loaded to recover
+your counts, while the widget reads back what Hyprland actually has and
+re-applies when the two drift — which is what happens on `hyprctl reload`,
+since anything set through `eval` is discarded there. Existing columns keep
+their own widths across a reload, so only the default for the next new column
+needs correcting.
 
 ## Multiple monitors
 

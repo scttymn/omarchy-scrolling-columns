@@ -47,6 +47,53 @@ function columnWidthText(n, usableWidth, overflowing) {
 // Overflowing only decides whether usableWidth is allowed to apply. At the
 // default usableWidth of 1 nothing is held back, so an overflowing tape is
 // not peeking and must not be described as though it were.
+// hyprctl --batch prints one JSON object per command, newline-separated and
+// then flattened, so they arrive concatenated: {...}{...}. Parsed positionally
+// rather than by name because getoption reports the option name but not a
+// stable ordering guarantee worth relying on -- each object carries its own
+// "option" field, so match on that.
+function parseOptions(text) {
+  var s = String(text || "")
+  var objects = []
+  var depth = 0, start = -1
+  for (var i = 0; i < s.length; i++) {
+    if (s[i] === "{") {
+      if (depth === 0) start = i
+      depth++
+    } else if (s[i] === "}") {
+      depth--
+      if (depth === 0 && start >= 0) {
+        try {
+          objects.push(JSON.parse(s.slice(start, i + 1)))
+        } catch (e) { /* skip a truncated object */ }
+        start = -1
+      }
+    }
+  }
+  if (objects.length === 0) return null
+
+  var out = { columnWidth: null, fullscreenOnOneColumn: null }
+  for (var j = 0; j < objects.length; j++) {
+    var o = objects[j]
+    var name = String(o.option || "")
+    if (name === "scrolling:column_width" && typeof o.float === "number")
+      out.columnWidth = o.float
+    else if (name === "scrolling:fullscreen_on_one_column" && typeof o.bool === "boolean")
+      out.fullscreenOnOneColumn = o.bool
+  }
+  return (out.columnWidth === null && out.fullscreenOnOneColumn === null) ? null : out
+}
+
+// Compared at the precision actually written, since the value goes to Hyprland
+// as three decimals and reading it back gives full float precision.
+function optionsMatch(live, wantedWidthText, wantedFullscreen) {
+  if (!live) return false
+  if (live.columnWidth === null) return false
+  if (live.columnWidth.toFixed(3) !== String(wantedWidthText)) return false
+  if (live.fullscreenOnOneColumn !== null && live.fullscreenOnOneColumn !== !!wantedFullscreen) return false
+  return true
+}
+
 function isPeeking(usableWidth, overflowing) {
   return !!overflowing && Number(usableWidth) < 1
 }
@@ -123,6 +170,8 @@ if (typeof module !== "undefined") {
     columnWidthText: columnWidthText,
     cycleNext: cycleNext,
     isPeeking: isPeeking,
+    optionsMatch: optionsMatch,
+    parseOptions: parseOptions,
     isPinned: isPinned,
     parseProbe: parseProbe,
     storedColumns: storedColumns,
