@@ -61,6 +61,16 @@ BarWidget {
   // actually flips.
   property int appliedPeekState: -1
 
+  property bool wasScrolling: false
+  onScrollingChanged: {
+    if (root.scrolling && !root.wasScrolling && root.workspaceId >= 0) {
+      root.appliedPeekState = -1
+      root.setDefaultWidth(root.columns)
+      root.resizeExistingColumns(root.columns)
+    }
+    root.wasScrolling = root.scrolling
+  }
+
   function syncPeek() {
     if (!root.scrolling) return
     var wanted = root.overflowing ? 1 : 0
@@ -214,7 +224,19 @@ BarWidget {
   function resizeExistingColumns(n) {
     if (!root.bar || !root.scrolling) return
     var lua = "hl.dsp.layout(\"colresize all " + root.widthText(n) + "\")"
-    root.bar.run("hyprctl dispatch " + Util.shellQuote(lua) + " >/dev/null 2>&1")
+    var cmd = "hyprctl dispatch " + Util.shellQuote(lua) + " >/dev/null 2>&1"
+
+    // Resizing columns does not move the viewport, so an offset left over from
+    // the previous widths survives and shows up as a gap at the leading edge
+    // with the last column cut off. Nothing re-anchors it on its own:
+    // fit_into_view is a no-op, move does not clamp at the start of the tape,
+    // and fit tobeg widens the columns. When the column count already equals
+    // the target, every column fits, so "fit all" recomputes exactly the
+    // widths we just set and re-anchors as a side effect -- a pure snap.
+    if (root.columnCount === n)
+      cmd += "; hyprctl dispatch " + Util.shellQuote("hl.dsp.layout(\"fit all\")") + " >/dev/null 2>&1"
+
+    root.bar.run(cmd)
   }
 
   // Survives `hyprctl reload`, which discards anything set through eval.
